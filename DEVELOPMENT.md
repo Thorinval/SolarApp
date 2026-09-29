@@ -1,11 +1,11 @@
-# Guide de développement - AtmoceSolarApp
+﻿# Guide de développement - SolarApp
 
 Guide pour les développeurs qui souhaitent contribuer ou étendre l'application.
 
 ## 🏗️ Architecture de l'application
 
 ```
-AtmoceSolarApp/
+SolarApp/
 ├── Components/
 │   ├── Pages/              # Pages Blazor
 │   │   ├── Home.razor      # Dashboard principal
@@ -64,7 +64,7 @@ Blazor Components (UI)
 
 ```bash
 # 1. Cloner le projet
-cd D:\AtmoceSolarApp
+cd D:\SolarApp
 
 # 2. Installer les dépendances
 dotnet restore
@@ -94,7 +94,7 @@ dotnet run
 2. **Ajouter la route et injection**
    ```razor
    @page "/history"
-   @using AtmoceSolarApp.Services
+   @using SolarApp.Services
    @inject SolarDataService SolarDataService
    ```
 
@@ -204,8 +204,8 @@ dotnet run
 
 Créer un projet de test :
 ```bash
-dotnet new xunit -n AtmoceSolarApp.Tests
-dotnet add reference AtmoceSolarApp/AtmoceSolarApp.csproj
+dotnet new xunit -n SolarApp.Tests
+dotnet add reference SolarApp/SolarApp.csproj
 ```
 
 Exemple de test :
@@ -344,3 +344,4 @@ Pour les questions ou problèmes :
 ---
 
 **Dernière mise à jour** : 19/09/2026
+

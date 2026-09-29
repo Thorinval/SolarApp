@@ -1,6 +1,6 @@
-@page "/site/{SiteId:int}"
-@using AtmoceSolarApp.Models
-@using AtmoceSolarApp.Services
+﻿@page "/site/{SiteId:int}"
+@using SolarApp.Models
+@using SolarApp.Services
 @inject SolarDataService SolarDataService
 @inject ILogger<SiteDetail> Logger
 @inject NavigationManager Navigation
@@ -189,3 +189,4 @@
 		}
 	}
 }
+

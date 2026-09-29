@@ -2,7 +2,7 @@
 
 <#
 .SYNOPSIS
-	Setup script for AtmoceSolarApp
+	Setup script for SolarApp
 .DESCRIPTION
 	Initializes the project with User Secrets and database migrations
 .EXAMPLE
@@ -11,7 +11,7 @@
 
 Write-Host ""
 Write-Host "============================================" -ForegroundColor Cyan
-Write-Host "AtmoceSolarApp - Configuration Setup" -ForegroundColor Cyan
+Write-Host "SolarApp - Configuration Setup" -ForegroundColor Cyan
 Write-Host "============================================" -ForegroundColor Cyan
 Write-Host ""
 

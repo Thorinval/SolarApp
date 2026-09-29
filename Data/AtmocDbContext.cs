@@ -1,7 +1,7 @@
-using Microsoft.EntityFrameworkCore;
-using AtmoceSolarApp.Models;
+﻿using Microsoft.EntityFrameworkCore;
+using SolarApp.Models;
 
-namespace AtmoceSolarApp.Data;
+namespace SolarApp.Data;
 
 public class AtmocDbContext : DbContext
 {
@@ -92,3 +92,4 @@ public class AtmocDbContext : DbContext
             .HasKey(at => at.Id);
     }
 }
+

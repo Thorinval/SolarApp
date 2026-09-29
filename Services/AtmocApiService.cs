@@ -1,11 +1,11 @@
-using System.Net.Http.Headers;
+﻿using System.Net.Http.Headers;
 using System.Text;
 using System.Text.Json;
-using AtmoceSolarApp.Models;
+using SolarApp.Models;
 using Microsoft.Extensions.Logging;
 using Newtonsoft.Json;
 
-namespace AtmoceSolarApp.Services;
+namespace SolarApp.Services;
 
 /// <summary>
 /// Service pour gérer l'authentification et les appels à l'API Atmoce
@@ -405,3 +405,4 @@ public class AtmocApiService
         return await AuthenticateAsync();
     }
 }
+

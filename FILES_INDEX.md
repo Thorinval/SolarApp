@@ -1,11 +1,11 @@
-# AtmoceSolarApp - Index des fichiers
+﻿# SolarApp - Index des fichiers
 
 Structure et description de tous les fichiers du projet.
 
 ## 📁 Structure du projet
 
 ```
-D:\AtmoceSolarApp/
+D:\SolarApp/
 ├── 📄 README.md                 # Guide d'utilisation principal
 ├── 📄 INSTALL.md                # Guide d'installation détaillé
 ├── 📄 DEVELOPMENT.md            # Guide de développement
@@ -51,7 +51,7 @@ D:\AtmoceSolarApp/
 ├── 📄 appsettings.json          # Configuration (placeholders)
 ├── 📄 appsettings.Development.json # Configuration développement
 │
-└── 📄 AtmoceSolarApp.csproj     # Fichier projet
+└── 📄 SolarApp.csproj     # Fichier projet
 ```
 
 ## 📋 Description détaillée des fichiers
@@ -197,7 +197,7 @@ Contient les pages Blazor.
 | Microsoft.EntityFrameworkCore.Design | 9.0.0 | Outils EF Core |
 | Newtonsoft.Json | 13.0.3 | Sérialisation JSON |
 
-Toutes les dépendances sont spécifiées dans `AtmoceSolarApp.csproj`.
+Toutes les dépendances sont spécifiées dans `SolarApp.csproj`.
 
 ## 📊 Modèle de données
 
@@ -263,3 +263,4 @@ Pour ajouter de nouvelles fonctionnalités :
 ---
 
 **Dernière mise à jour** : 19/09/2026
+

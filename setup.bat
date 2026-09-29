@@ -1,9 +1,9 @@
 @echo off
-REM Configuration script for AtmoceSolarApp
+REM Configuration script for SolarApp
 
 echo.
 echo ============================================
-echo AtmoceSolarApp - Configuration Setup
+echo SolarApp - Configuration Setup
 echo ============================================
 echo.
 

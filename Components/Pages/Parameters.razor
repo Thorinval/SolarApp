@@ -1,5 +1,5 @@
-@page "/parametres"
-@using AtmoceSolarApp.Services
+﻿@page "/parametres"
+@using SolarApp.Services
 @inject ExcelDailyReportService ExcelDailyReportService
 
 <PageTitle>Paramètres</PageTitle>
@@ -161,3 +161,4 @@
 	private sealed record SubscriptionTariffRow(string DateDebut, string DateFin, string Tarif);
 	private sealed record KwhTariffRow(string DateDebut, string DateFin, string TarifHc, string TarifHp);
 }
+

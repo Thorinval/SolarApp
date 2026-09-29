@@ -1,6 +1,6 @@
 ﻿@page "/"
-@using AtmoceSolarApp.Models
-@using AtmoceSolarApp.Services
+@using SolarApp.Models
+@using SolarApp.Services
 @using Microsoft.EntityFrameworkCore
 @inject SolarDataService SolarDataService
 @inject ILogger<Home> Logger
@@ -9,7 +9,7 @@
 
 <div class="container-fluid py-4">
     <h1 class="mb-5">
-        <i class="bi bi-sun"></i> Tableau de Bord - Suivi Solaire Atmoce
+        <i class="bi bi-sun"></i> Tableau de Bord - Suivi Solaire
     </h1>
 
     <!-- Navigation Tiles -->
@@ -243,3 +243,4 @@
         await OnInitializedAsync();
     }
 }
+

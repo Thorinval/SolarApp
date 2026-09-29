@@ -2,7 +2,7 @@
 
 #nullable disable
 
-namespace AtmoceSolarApp.Data.Migrations
+namespace SolarApp.Data.Migrations
 {
     /// <inheritdoc />
     public partial class AddDailyEnergyRecordColumnI : Migration
@@ -27,3 +27,4 @@ namespace AtmoceSolarApp.Data.Migrations
         }
     }
 }
+

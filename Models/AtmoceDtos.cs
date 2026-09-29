@@ -1,6 +1,6 @@
-using System.Text.Json.Serialization;
+﻿using System.Text.Json.Serialization;
 
-namespace AtmoceSolarApp.Models;
+namespace SolarApp.Models;
 
 /// <summary>
 /// Response wrapper pour toutes les réponses API Atmoce
@@ -571,3 +571,4 @@ public class SiteEnergyDto
     [JsonPropertyName("batteryDischarge")]
     public double BatteryDischarge { get; set; }
 }
+

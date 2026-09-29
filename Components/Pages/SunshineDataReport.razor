@@ -1,6 +1,6 @@
-@page "/donnees-ensoleillement"
+﻿@page "/donnees-ensoleillement"
 @using System.Globalization
-@using AtmoceSolarApp.Services
+@using SolarApp.Services
 @inject ExcelDailyReportService ExcelDailyReportService
 @rendermode InteractiveServer
 
@@ -278,3 +278,4 @@
 	private sealed record ColumnConfig(int ColumnIndex, string Fallback, bool IsPercent);
 	private sealed record BlockConfig(string Title, List<ColumnConfig> Columns);
 }
+

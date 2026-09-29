@@ -802,14 +802,16 @@ window.solarCharts = {
 
         draw();
 
-        const barPoints = barSeries
+        const barSeriesStats = (config.barSeries || []).filter(s => Array.isArray(s.values));
+        const lineSeriesStats = (config.lineSeries || []).filter(s => Array.isArray(s.values));
+        const barPoints = barSeriesStats
             .flatMap(s => Array.isArray(s.values) ? s.values : [])
             .filter(v => typeof v === 'number' && isFinite(v)).length;
-        const linePoints = lineSeries
+        const linePoints = lineSeriesStats
             .flatMap(s => Array.isArray(s.values) ? s.values : [])
             .filter(v => typeof v === 'number' && isFinite(v)).length;
 
-        return `ok labels=${(config.labels || []).length} bars=${barSeries.length} lines=${lineSeries.length} points=${barPoints + linePoints}`;
+        return `ok labels=${(config.labels || []).length} bars=${barSeriesStats.length} lines=${lineSeriesStats.length} points=${barPoints + linePoints}`;
     },
 
     _hexToRgba(hex, alpha) {

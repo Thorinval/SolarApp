@@ -1,6 +1,6 @@
-🎉 APPLICATION BLAZOR SERVER - SUIVI INSTALLATION SOLAIRE ATMOCE
+﻿🎉 APPLICATION BLAZOR SERVER - SUIVI INSTALLATION SOLAIRE ATMOCE
 
-📍 Location: D:\AtmoceSolarApp
+📍 Location: D:\SolarApp
 
 ✅ CRÉATION RÉUSSIE !
 
@@ -8,7 +8,7 @@
 
 📦 STRUCTURE DU PROJET
 
-AtmoceSolarApp/
+SolarApp/
 ├── 📄 README.md                 ← LIRE EN PREMIER
 ├── 📄 INSTALL.md                ← Installation détaillée
 ├── 📄 DEVELOPMENT.md            ← Guide de développement
@@ -46,7 +46,7 @@ AtmoceSolarApp/
 ├── 📄 Program.cs                ← Configuration app
 ├── 📄 appsettings.json          ← Configuration base
 ├── 📄 appsettings.Development.json
-├── 📄 AtmoceSolarApp.csproj     ← Fichier projet
+├── 📄 SolarApp.csproj     ← Fichier projet
 ├── 📄 .gitignore                ← Fichiers à ignorer
 ├── setup.bat                    ← Script setup Windows
 └── setup.ps1                    ← Script setup PowerShell
@@ -135,7 +135,7 @@ Migrations              : 1 (InitialCreate)
 
 1. Configurer les credentials Atmoce:
    ────────────────────────────────────
-   cd D:\AtmoceSolarApp
+   cd D:\SolarApp
    dotnet user-secrets init
    dotnet user-secrets set "Atmoce:BaseUrl" "https://YOUR_URL/openapi/v1"
    dotnet user-secrets set "Atmoce:ApiKey" "YOUR_API_KEY"
@@ -211,3 +211,4 @@ En cas de problème:
 Votre application Blazor Server pour le suivi solaire Atmoce est prête !
 
 Bonne utilisation ! 🌞
+

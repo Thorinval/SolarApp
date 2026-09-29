@@ -1,9 +1,9 @@
-@page "/graphiques"
+﻿@page "/graphiques"
 @rendermode InteractiveServer
 @using System.Globalization
 @using System.Text.RegularExpressions
-@using AtmoceSolarApp.Data
-@using AtmoceSolarApp.Services
+@using SolarApp.Data
+@using SolarApp.Services
 @using Microsoft.EntityFrameworkCore
 @inject AtmocDbContext DbContext
 @inject ExcelDailyReportService ExcelDailyReportService
@@ -89,8 +89,7 @@
 	private readonly List<string> ecowattLabels = new();
 	private readonly List<double?> ecowattBill2025 = new();
 	private readonly List<double?> ecowattBill2026 = new();
-	private readonly List<double?> autonomySolar = new();
-	private int? autonomyYear;
+	private readonly List<AutonomySeriesData> autonomySeries = new();
 	private readonly Dictionary<(int Year, int Month), double> ecowattMonthlyBills = new();
 
 	// Répartition des sources d'énergie (Bilan énergie sheet)
@@ -134,10 +133,10 @@
 		}
 
 		await LoadEcowattMonthlyBillsAsync();
-		await LoadMonthlyAutonomyAsync();
 
 		// Charger les données du Bilan énergie pour la répartition
 		var bilanResult = await ExcelDailyReportService.ReadSheetContentAsync("Bilan énergie", 16);
+		var autonomieIndex = bilanResult.Headers.FindIndex(h => h.Contains("Autonomie", StringComparison.OrdinalIgnoreCase));
 		foreach (var row in bilanResult.Rows)
 		{
 			if (row.Count == 0)
@@ -161,8 +160,9 @@
 			var consoTotale = ParseEnergyValue(GetCell(row, 9));       // J
 			var reseauKwh = ParseEnergyValue(GetCell(row, 12));        // M
 			var batterieKwh = ParseEnergyValue(GetCell(row, 7));       // H
-			var venteKwh = ParseEnergyValue(GetCell(row, 6));           // G
+			var venteKwh = ParseEnergyValue(GetCell(row, 6));          // G
 			var solaireKwh = ParseEnergyValue(GetCell(row, 13));       // N
+			var autonomie = autonomieIndex >= 0 ? ParseEnergyValue(GetCell(row, autonomieIndex)) : null;
 
 			bilanData.Add(new BilanRowData(
 				label: month,
@@ -170,7 +170,8 @@
 				consoReseau: CalculatePercent(reseauKwh, consoTotale),
 				soutirerBatterie: CalculatePercent(batterieKwh, consoTotale),
 				venteKwh: venteKwh,
-				consoSolaire: CalculatePercent(solaireKwh, consoTotale)));
+				consoSolaire: CalculatePercent(solaireKwh, consoTotale),
+				autonomie: autonomie));
 		}
 
 		AssignMissingBilanYears();
@@ -188,6 +189,8 @@
 				? DateTime.Now.Year
 				: availableBilanYears[^1];
 		}
+
+		await LoadMonthlyAutonomyAsync();
 
 		isLoading = false;
 	}
@@ -268,46 +271,47 @@
 		BuildEcowattMonthlyBillSeries();
 	}
 
-	private async Task LoadMonthlyAutonomyAsync()
+	private Task LoadMonthlyAutonomyAsync()
 	{
-		autonomySolar.Clear();
-		autonomyYear = null;
+		autonomySeries.Clear();
 
-		var years = await DbContext.DailyEnergyRecords
-			.AsNoTracking()
-			.Select(r => r.RecordDate.Year)
+		var palette = new[]
+		{
+			"#7030a0",
+			"#00b0f0",
+			"#2e75b6",
+			"#ed7d31",
+			"#2f9e44",
+			"#c00000"
+		};
+
+		var years = bilanData
+			.Where(d => d.Year.HasValue && d.Year.Value >= 2026)
+			.Select(d => d.Year!.Value)
 			.Distinct()
 			.OrderBy(y => y)
-			.ToListAsync();
+			.ToList();
 
-		if (years.Count == 0)
+		for (var i = 0; i < years.Count; i++)
 		{
-			for (var month = 1; month <= 12; month++)
-			{
-				autonomySolar.Add(null);
-			}
+			var year = years[i];
+			var valuesByMonth = bilanData
+				.Where(d => d.Year == year)
+				.ToDictionary(d => GetMonthRank(d.Label), d => d.Autonomie);
 
-			return;
+			var values = Enumerable.Range(1, 12)
+				.Select(month => valuesByMonth.TryGetValue(month, out var value) ? value : null)
+				.ToList();
+
+			autonomySeries.Add(new AutonomySeriesData
+			{
+				Name = $"Autonomie solaire {year}",
+				Values = values,
+				Color = palette[i % palette.Length]
+			});
 		}
 
-		autonomyYear = years[^1];
-		var monthlyValues = await DbContext.DailyEnergyRecords
-			.AsNoTracking()
-			.Where(r => r.RecordDate.Year == autonomyYear.Value)
-			.GroupBy(r => r.RecordDate.Month)
-			.Select(g => new
-			{
-				Month = g.Key,
-				Consumed = g.Sum(x => x.ConsumedKwh),
-				FromGrid = g.Sum(x => x.FromGridKwh)
-			})
-			.ToListAsync();
-
-		var valuesByMonth = monthlyValues.ToDictionary(x => x.Month, x => CalculatePercent(x.FromGrid, x.Consumed));
-		for (var month = 1; month <= 12; month++)
-		{
-			autonomySolar.Add(valuesByMonth.TryGetValue(month, out var value) ? value : null);
-		}
+		return Task.CompletedTask;
 	}
 
 	private void BuildEcowattMonthlyBillSeries()
@@ -429,13 +433,29 @@
 
 	private async Task<string> RenderEcowattMonthlyBillChartAsync()
 	{
-		var latestBilanYear = availableBilanYears.Count > 0 ? availableBilanYears[^1] : (int?)null;
+		var venteYear = bilanData
+			.Where(d => d.Year.HasValue)
+			.GroupBy(d => d.Year!.Value)
+			.Where(g => g.Any(r => r.VenteKwh.HasValue && Math.Abs(r.VenteKwh.Value) > 0))
+			.Select(g => g.Key)
+			.DefaultIfEmpty()
+			.Max();
+
 		var venteByMonth = Enumerable.Range(1, 12)
-			.Select(month => latestBilanYear.HasValue
-				? bilanData.FirstOrDefault(d => d.Year == latestBilanYear.Value && GetMonthRank(d.Label) == month)?.VenteKwh is double vente
-					? -Math.Abs(vente)
-					: (double?)null
-				: (double?)null)
+			.Select(month =>
+			{
+				if (venteYear == 0)
+				{
+					return (double?)null;
+				}
+
+				var vente = bilanData
+					.Where(d => d.Year == venteYear && GetMonthRank(d.Label) == month && d.VenteKwh.HasValue)
+					.Select(d => d.VenteKwh)
+					.FirstOrDefault();
+
+				return vente.HasValue ? -Math.Abs(vente.Value) : (double?)null;
+			})
 			.ToList();
 
 		return await JS.InvokeAsync<string>("solarCharts.renderBillEvolutionChart", ecowattMonthlyBillCanvas, new
@@ -454,10 +474,7 @@
 				new { name = "Facture 2026", values = ecowattBill2026, color = "#ed7d31" },
 				new { name = "Vente kWh", values = venteByMonth, color = "#2f9e44" }
 			},
-			lineSeries = new[]
-			{
-				new { name = autonomyYear.HasValue ? $"Autonomie solaire {autonomyYear.Value}" : "Autonomie solaire", values = autonomySolar, color = "#7030a0" }
-			}
+			lineSeries = autonomySeries.Select(s => new { name = s.Name, values = s.Values, color = s.Color }).ToList()
 		});
 	}
 
@@ -563,7 +580,7 @@
 
 	private sealed class BilanRowData
 	{
-		public BilanRowData(string label, int? year, double? consoReseau, double? soutirerBatterie, double? venteKwh, double? consoSolaire)
+		public BilanRowData(string label, int? year, double? consoReseau, double? soutirerBatterie, double? venteKwh, double? consoSolaire, double? autonomie)
 		{
 			Label = label;
 			Year = year;
@@ -571,6 +588,7 @@
 			SoutirerBatterie = soutirerBatterie;
 			VenteKwh = venteKwh;
 			ConsoSolaire = consoSolaire;
+			Autonomie = autonomie;
 		}
 
 		public string Label { get; }
@@ -579,6 +597,14 @@
 		public double? SoutirerBatterie { get; }
 		public double? VenteKwh { get; }
 		public double? ConsoSolaire { get; }
+		public double? Autonomie { get; }
+	}
+
+	private sealed class AutonomySeriesData
+	{
+		public required string Name { get; init; }
+		public required List<double?> Values { get; init; }
+		public required string Color { get; init; }
 	}
 
 	private static string GetCell(IReadOnlyList<string> row, int index)
@@ -682,3 +708,4 @@
 		return null;
 	}
 }
+

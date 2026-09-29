@@ -1,9 +1,9 @@
-using AtmoceSolarApp.Data;
-using AtmoceSolarApp.Models;
+﻿using SolarApp.Data;
+using SolarApp.Models;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Logging;
 
-namespace AtmoceSolarApp.Services;
+namespace SolarApp.Services;
 
 /// <summary>
 /// Service métier pour gérer la logique de synchronisation et récupération des données solaires
@@ -407,3 +407,4 @@ public class SolarDataService
         }
     }
 }
+

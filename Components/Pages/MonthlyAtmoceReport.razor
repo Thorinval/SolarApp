@@ -1,6 +1,6 @@
-@page "/releve-mensuel-atmoce"
+﻿@page "/releve-mensuel-atmoce"
 @using System.Globalization
-@using AtmoceSolarApp.Data
+@using SolarApp.Data
 @using Microsoft.EntityFrameworkCore
 @inject AtmocDbContext DbContext
 @rendermode InteractiveServer
@@ -234,7 +234,7 @@
 		};
 	}
 
-	private MonthlyRowVm BuildMonthlyRow(DateOnly monthDate, IEnumerable<AtmoceSolarApp.Models.DailyEnergyRecord> monthRecords)
+	private MonthlyRowVm BuildMonthlyRow(DateOnly monthDate, IEnumerable<SolarApp.Models.DailyEnergyRecord> monthRecords)
 	{
 		var producedKwh = monthRecords.Sum(x => x.ProducedKwh);
 		var consumedKwh = monthRecords.Sum(x => x.ConsumedKwh);
@@ -356,3 +356,4 @@
 		DaysWithSocMin
 	}
 }
+

@@ -1,4 +1,4 @@
-# 🎉 Résumé de l'implémentation - AtmoceSolarApp
+﻿# 🎉 Résumé de l'implémentation - SolarApp
 
 Application Web Blazor Server pour le suivi et la gestion d'installations solaires via l'API Atmoce-Cloud.
 
@@ -236,7 +236,7 @@ Application Web Blazor Server pour le suivi et la gestion d'installations solair
 
 1. **Cloner/Télécharger**
    ```bash
-   cd D:\AtmoceSolarApp
+   cd D:\SolarApp
    ```
 
 2. **Configurer les credentials**
@@ -297,3 +297,4 @@ Prête pour le déploiement avec configuration appropriée des credentials et de
 **Livré le** : 2026-09-19
 **Version** : 1.0.0
 **Statut** : ✅ Production-Ready (avec limitations listées)
+

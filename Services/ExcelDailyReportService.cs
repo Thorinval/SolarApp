@@ -1,10 +1,10 @@
-using System.Globalization;
-using AtmoceSolarApp.Data;
-using AtmoceSolarApp.Models;
+﻿using System.Globalization;
+using SolarApp.Data;
+using SolarApp.Models;
 using ClosedXML.Excel;
 using Microsoft.EntityFrameworkCore;
 
-namespace AtmoceSolarApp.Services;
+namespace SolarApp.Services;
 
 public class ExcelDailyReportService
 {
@@ -391,3 +391,4 @@ public class ExcelDailyReportService
         return 0;
     }
 }
+

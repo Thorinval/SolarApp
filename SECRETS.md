@@ -1,9 +1,9 @@
-## Configuration des secrets pour le développement
+﻿## Configuration des secrets pour le développement
 
 ### Initialiser User Secrets
 
 ```bash
-cd D:\AtmoceSolarApp
+cd D:\SolarApp
 dotnet user-secrets init
 ```
 
@@ -57,3 +57,4 @@ En production, utilisez :
 - [ ] Logs configurés pour production
 - [ ] HTTPS activé
 - [ ] CORS configuré si nécessaire
+

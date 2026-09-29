@@ -1,4 +1,4 @@
-# Installation Guide - AtmoceSolarApp
+﻿# Installation Guide - SolarApp
 
 Guide complet d'installation et de configuration de l'application Blazor Server pour le suivi solaire Atmoce.
 
@@ -18,7 +18,7 @@ Guide complet d'installation et de configuration de l'application Blazor Server 
 ### Option 1 : Script automatisé
 
 ```bash
-cd D:\AtmoceSolarApp
+cd D:\SolarApp
 .\setup.ps1
 ```
 
@@ -32,7 +32,7 @@ Suivez les prompts pour configurer :
 #### Étape 1 : Cloner/Télécharger le projet
 
 ```bash
-cd D:\AtmoceSolarApp
+cd D:\SolarApp
 ```
 
 #### Étape 2 : Installer les dépendances
@@ -113,7 +113,7 @@ docker run -e "ACCEPT_EULA=Y" -e "SA_PASSWORD=YourPassword123!" \
 
 ```bash
 # Cloner le projet
-cd AtmoceSolarApp
+cd SolarApp
 
 # Installer les dépendances
 dotnet restore
@@ -366,3 +366,4 @@ Après l'installation réussie :
 ---
 
 **Dernière mise à jour** : 19/09/2026
+

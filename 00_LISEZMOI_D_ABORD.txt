@@ -1,4 +1,4 @@
-╔═══════════════════════════════════════════════════════════════════════════════╗
+﻿╔═══════════════════════════════════════════════════════════════════════════════╗
 ║                                                                               ║
 ║           🌞 APPLICATION BLAZOR SERVER - SUIVI SOLAIRE ATMOCE 🌞             ║
 ║                                                                               ║
@@ -6,7 +6,7 @@
 ║                                                                               ║
 ╚═══════════════════════════════════════════════════════════════════════════════╝
 
-👋 BIENVENUE DANS ATMOCESOLARAPP !
+👋 BIENVENUE DANS SolarApp !
 
 Votre application web pour le suivi et la gestion de votre installation solaire
 est maintenant prête à être utilisée.
@@ -17,7 +17,7 @@ est maintenant prête à être utilisée.
 
 1️⃣  CONFIGURER VOS CREDENTIALS ATMOCE
 
-   cd D:\AtmoceSolarApp
+   cd D:\SolarApp
    dotnet user-secrets init
    dotnet user-secrets set "Atmoce:BaseUrl" "https://YOUR_URL/openapi/v1"
    dotnet user-secrets set "Atmoce:ApiKey" "YOUR_API_KEY"
@@ -219,3 +219,4 @@ Bonne chance ! 🚀
 ═══════════════════════════════════════════════════════════════════════════════
 
 Version 1.0.0 - 2026-09-19 - Prêt pour la production
+

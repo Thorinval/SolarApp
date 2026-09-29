@@ -1,4 +1,4 @@
-namespace AtmoceSolarApp.Models;
+﻿namespace SolarApp.Models;
 
 /// <summary>
 /// Entité Site pour la base de données
@@ -191,3 +191,4 @@ public class ApiToken
     public DateTime CreatedAt { get; set; } = DateTime.UtcNow;
     public DateTime UpdatedAt { get; set; } = DateTime.UtcNow;
 }
+

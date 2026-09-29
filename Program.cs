@@ -1,6 +1,6 @@
-using AtmoceSolarApp.Components;
-using AtmoceSolarApp.Data;
-using AtmoceSolarApp.Services;
+﻿using SolarApp.Components;
+using SolarApp.Data;
+using SolarApp.Services;
 using Microsoft.EntityFrameworkCore;
 
 var builder = WebApplication.CreateBuilder(args);
@@ -65,3 +65,4 @@ app.MapRazorComponents<App>()
     .AddInteractiveServerRenderMode();
 
 app.Run();
+

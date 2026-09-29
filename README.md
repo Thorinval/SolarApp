@@ -1,4 +1,4 @@
-# Application Web Blazor Server - Suivi Installation Solaire Atmoce
+﻿# Application Web Blazor Server - Suivi Installation Solaire Atmoce
 
 Application web permettant de monitorer et gérer votre installation solaire via l'API Atmoce-Cloud.
 
@@ -13,7 +13,7 @@ Application web permettant de monitorer et gérer votre installation solaire via
 
 1. **Cloner/ouvrir le projet**
    ```bash
-   cd D:\AtmoceSolarApp
+   cd D:\SolarApp
    ```
 
 2. **Configurer la base de données**
@@ -193,3 +193,4 @@ https://api.library.loxone.com/
 ---
 
 **Dernière mise à jour** : 19/09/2026
+

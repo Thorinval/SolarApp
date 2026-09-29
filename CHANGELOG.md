@@ -1,4 +1,4 @@
-# Changelog - AtmoceSolarApp
+﻿# Changelog - SolarApp
 
 Toutes les modifications et versions de l'application.
 
@@ -215,3 +215,4 @@ Exemple: `1.0.0` → `1.1.0` (nouvelles fonctionnalités) → `1.1.1` (patch bug
 ---
 
 Dernière mise à jour : 2026-09-19
+

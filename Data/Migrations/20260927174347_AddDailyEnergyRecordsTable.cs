@@ -3,7 +3,7 @@ using Microsoft.EntityFrameworkCore.Migrations;
 
 #nullable disable
 
-namespace AtmoceSolarApp.Data.Migrations
+namespace SolarApp.Data.Migrations
 {
     /// <inheritdoc />
     public partial class AddDailyEnergyRecordsTable : Migration
@@ -47,3 +47,4 @@ namespace AtmoceSolarApp.Data.Migrations
         }
     }
 }
+
