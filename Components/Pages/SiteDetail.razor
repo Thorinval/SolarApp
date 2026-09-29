@@ -1,0 +1,191 @@
+@page "/site/{SiteId:int}"
+@using AtmoceSolarApp.Models
+@using AtmoceSolarApp.Services
+@inject SolarDataService SolarDataService
+@inject ILogger<SiteDetail> Logger
+@inject NavigationManager Navigation
+
+<PageTitle>Détails du Site</PageTitle>
+
+<div class="container-fluid py-4">
+	@if (isLoading)
+	{
+		<div class="alert alert-info">
+			<div class="spinner-border spinner-border-sm me-2"></div>
+			Chargement...
+		</div>
+	}
+	else if (site == null)
+	{
+		<div class="alert alert-danger">
+			Site non trouvé.
+		</div>
+	}
+	else
+	{
+		<div class="row mb-4">
+			<div class="col-12">
+				<a href="/" class="btn btn-secondary mb-3">
+					<i class="bi bi-arrow-left"></i> Retour au tableau de bord
+				</a>
+			</div>
+		</div>
+
+		<div class="row">
+			<div class="col-md-6 mb-4">
+				<div class="card">
+					<div class="card-header bg-primary text-white">
+						<h5 class="card-title mb-0">@site.Name</h5>
+					</div>
+					<div class="card-body">
+						<p><strong>Site ID :</strong> @site.SiteId</p>
+						<p><strong>État :</strong> <span class="badge bg-success">@site.BuildState</span></p>
+						<p><strong>Adresse :</strong> @site.Address</p>
+						<p><strong>Code Postal :</strong> @site.ZipCode</p>
+						<p><strong>Fuseau horaire :</strong> @site.TimeZone</p>
+						<p><strong>Capacité solaire :</strong> @site.SolarCapacity.ToString("F2") kWp</p>
+						<p><strong>Capacité batterie :</strong> @site.BatteryCapacity.ToString("F2") kWh</p>
+					</div>
+				</div>
+			</div>
+
+			@if (lastSnapshot != null)
+			{
+				<div class="col-md-6 mb-4">
+					<div class="card">
+						<div class="card-header bg-success text-white">
+							<h5 class="card-title mb-0">Données actuelles</h5>
+						</div>
+						<div class="card-body">
+							<p><strong>Production solaire :</strong> <span class="text-success">@lastSnapshot.SolarGenerationPower W</span></p>
+							<p><strong>Consommation :</strong> <span class="text-warning">@lastSnapshot.ConsumptionPower W</span></p>
+							<p><strong>Puissance réseau :</strong> @lastSnapshot.GridPower W</p>
+							<p><strong>Production du jour :</strong> @lastSnapshot.DailySolarGeneration.ToString("F2") kWh</p>
+							<p><strong>État batterie :</strong> @lastSnapshot.BatterySOC.ToString("F0")% (@lastSnapshot.BatteryStatus)</p>
+							<p><strong>Mise à jour :</strong> <small class="text-muted">@lastSnapshot.SnapshotTime.ToString("G")</small></p>
+						</div>
+					</div>
+				</div>
+			}
+		</div>
+
+		<div class="row">
+			<div class="col-12 mb-4">
+				<div class="card">
+					<div class="card-header bg-info text-white">
+						<h5 class="card-title mb-0">Appareils du site</h5>
+					</div>
+					<div class="card-body">
+						@if (devices.Count == 0)
+						{
+							<p class="text-muted">Aucun appareil enregistré</p>
+						}
+						else
+						{
+							<div class="table-responsive">
+								<table class="table table-striped">
+									<thead>
+										<tr>
+											<th>Type</th>
+											<th>Numéro de série</th>
+											<th>Statut</th>
+											<th>Capacité</th>
+											<th>Dernière mise à jour</th>
+										</tr>
+									</thead>
+									<tbody>
+										@foreach (var device in devices)
+										{
+											<tr>
+												<td>
+													@switch (device.DeviceType?.ToLower())
+													{
+														case "gateway":
+															<span class="badge bg-primary">Passerelle</span>
+															break;
+														case "micro_inverter":
+															<span class="badge bg-info">Microinverteur</span>
+															break;
+														case "storage":
+															<span class="badge bg-success">Batterie</span>
+															break;
+														default:
+															<span class="badge bg-secondary">@device.DeviceType</span>
+															break;
+													}
+												</td>
+												<td>@device.DeviceSerialNumber</td>
+												<td>@device.Status</td>
+												<td>@device.Capacity.ToString("F2")</td>
+												<td>@device.LastReportedTime.ToString("G")</td>
+											</tr>
+										}
+									</tbody>
+								</table>
+							</div>
+						}
+					</div>
+				</div>
+			</div>
+		</div>
+
+		@if (alerts.Count > 0)
+		{
+			<div class="row">
+				<div class="col-12 mb-4">
+					<div class="card border-danger">
+						<div class="card-header bg-danger text-white">
+							<h5 class="card-title mb-0">Alertes actives</h5>
+						</div>
+						<div class="card-body">
+							@foreach (var alert in alerts)
+							{
+								<div class="alert alert-warning mb-2">
+									<strong>@alert.AlarmName</strong> - 
+									<span class="badge bg-warning">@alert.AlarmLevel</span>
+									<p class="mb-1">@alert.AlarmCause</p>
+									<small class="text-muted">Appareil : @alert.DeviceSerialNumber</small>
+								</div>
+							}
+						</div>
+					</div>
+				</div>
+			</div>
+		}
+	}
+</div>
+
+@code {
+	[Parameter]
+	public int SiteId { get; set; }
+
+	private Site? site;
+	private List<Device> devices = new();
+	private List<DeviceAlert> alerts = new();
+	private SiteDataSnapshot? lastSnapshot;
+	private bool isLoading = true;
+
+	protected override async Task OnInitializedAsync()
+	{
+		try
+		{
+			site = await SolarDataService.GetSiteAsync(SiteId);
+			if (site != null)
+			{
+				devices = await SolarDataService.GetDevicesAsync(SiteId);
+				alerts = await SolarDataService.GetActiveAlertsAsync(site.SiteId!);
+
+				var snapshots = await SolarDataService.GetSiteDataSnapshotsAsync(SiteId, 1);
+				lastSnapshot = snapshots.FirstOrDefault();
+			}
+		}
+		catch (Exception ex)
+		{
+			Logger.LogError(ex, "Erreur lors du chargement du site");
+		}
+		finally
+		{
+			isLoading = false;
+		}
+	}
+}

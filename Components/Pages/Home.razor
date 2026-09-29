@@ -1,0 +1,245 @@
+﻿@page "/"
+@using AtmoceSolarApp.Models
+@using AtmoceSolarApp.Services
+@using Microsoft.EntityFrameworkCore
+@inject SolarDataService SolarDataService
+@inject ILogger<Home> Logger
+
+<PageTitle>Tableau de Bord - Suivi Solaire</PageTitle>
+
+<div class="container-fluid py-4">
+    <h1 class="mb-5">
+        <i class="bi bi-sun"></i> Tableau de Bord - Suivi Solaire Atmoce
+    </h1>
+
+    <!-- Navigation Tiles -->
+    <div class="navigation-tiles mb-5">
+        <h2 class="mb-4">Navigation</h2>
+        <div class="tiles-grid">
+            <a href="/bilan-energie" class="nav-tile">
+                <div class="tile-icon">
+                    <i class="bi bi-lightning-fill"></i>
+                </div>
+                <div class="tile-content">
+                    <h3>Bilan énergie solaire</h3>
+                    <p>Analyse complète du bilan énergétique</p>
+                </div>
+            </a>
+
+            <a href="/releve-quotidien-atmoce" class="nav-tile">
+                <div class="tile-icon">
+                    <i class="bi bi-calendar-day"></i>
+                </div>
+                <div class="tile-content">
+                    <h3>Relevé quotidien Atmoce</h3>
+                    <p>Données journalières détaillées</p>
+                </div>
+            </a>
+
+            <a href="/releve-mensuel-atmoce" class="nav-tile">
+                <div class="tile-icon">
+                    <i class="bi bi-calendar3"></i>
+                </div>
+                <div class="tile-content">
+                    <h3>Relevé mensuel Atmoce</h3>
+                    <p>Synthèse mensuelle des données</p>
+                </div>
+            </a>
+
+            <a href="/releve-linky" class="nav-tile">
+                <div class="tile-icon">
+                    <i class="bi bi-lightning-charge"></i>
+                </div>
+                <div class="tile-content">
+                    <h3>Relevé Linky</h3>
+                    <p>Données du compteur Linky</p>
+                </div>
+            </a>
+
+            <a href="/releve-ecowatt" class="nav-tile">
+                <div class="tile-icon">
+                    <i class="bi bi-graph-up"></i>
+                </div>
+                <div class="tile-content">
+                    <h3>Relevé Ecowatt</h3>
+                    <p>Signal Ecowatt et tendances</p>
+                </div>
+            </a>
+
+            <a href="/donnees-ensoleillement" class="nav-tile">
+                <div class="tile-icon">
+                    <i class="bi bi-cloud-sun"></i>
+                </div>
+                <div class="tile-content">
+                    <h3>Données ensoleillement</h3>
+                    <p>Analyses d'ensoleillement et couverture</p>
+                </div>
+            </a>
+
+            <a href="/graphiques" class="nav-tile">
+                <div class="tile-icon">
+                    <i class="bi bi-graph-up"></i>
+                </div>
+                <div class="tile-content">
+                    <h3>Graphiques</h3>
+                    <p>Visualisations et statistiques</p>
+                </div>
+            </a>
+
+            <a href="/parametres" class="nav-tile">
+                <div class="tile-icon">
+                    <i class="bi bi-gear"></i>
+                </div>
+                <div class="tile-content">
+                    <h3>Paramètres</h3>
+                    <p>Configuration des tarifs et préférences</p>
+                </div>
+            </a>
+        </div>
+    </div>
+
+    <hr class="my-5" />
+
+    <!-- Sites Data -->
+    <h2 class="mb-4">Sites solaires</h2>
+
+    @if (isLoading)
+    {
+        <div class="alert alert-info">
+            <div class="spinner-border spinner-border-sm me-2" role="status">
+                <span class="visually-hidden">Chargement...</span>
+            </div>
+            Chargement des données...
+        </div>
+    }
+    else if (errorMessage != null)
+    {
+        <div class="alert alert-danger alert-dismissible fade show" role="alert">
+            <strong>Erreur :</strong> @errorMessage
+            <button type="button" class="btn-close" @onclick="() => errorMessage = null"></button>
+        </div>
+    }
+    else if (sites.Count == 0)
+    {
+        <div class="alert alert-warning">
+            Aucun site trouvé. <a href="/sync">Synchroniser maintenant</a>
+        </div>
+    }
+    else
+    {
+        <div class="row">
+            <div class="col-12 mb-3">
+                <button class="btn btn-primary" @onclick="RefreshData">
+                    <i class="bi bi-arrow-clockwise"></i> Actualiser les données
+                </button>
+                <a href="/sync" class="btn btn-secondary">
+                    <i class="bi bi-cloud-arrow-down"></i> Synchroniser avec Atmoce
+                </a>
+            </div>
+        </div>
+
+        <div class="row">
+            @foreach (var site in sites)
+            {
+                <div class="col-md-6 col-lg-4 mb-4">
+                    <div class="card h-100">
+                        <div class="card-header bg-primary text-white">
+                            <h5 class="card-title mb-0">
+                                <i class="bi bi-map"></i> @site.Name
+                            </h5>
+                        </div>
+                        <div class="card-body">
+                            <p class="card-text">
+                                <strong>État :</strong> 
+                                @if (site.BuildState?.ToLower() == "completed")
+                                {
+                                    <span class="badge bg-success">Installé</span>
+                                }
+                                else
+                                {
+                                    <span class="badge bg-warning">En cours</span>
+                                }
+                            </p>
+                            <p class="card-text">
+                                <strong>Capacité solaire :</strong> @site.SolarCapacity.ToString("F2") kWp
+                            </p>
+                            <p class="card-text">
+                                <strong>Capacité batterie :</strong> @site.BatteryCapacity.ToString("F2") kWh
+                            </p>
+                            <p class="card-text">
+                                <strong>Zone horaire :</strong> @site.TimeZone
+                            </p>
+
+                            @if (lastSnapshots.ContainsKey(site.Id))
+                            {
+                                var snapshot = lastSnapshots[site.Id].FirstOrDefault();
+                                @if (snapshot != null)
+                                {
+                                    <hr />
+                                    <p class="card-text">
+                                        <strong>Production solaire :</strong> 
+                                        <span class="text-success">@snapshot.SolarGenerationPower W</span>
+                                    </p>
+                                    <p class="card-text">
+                                        <strong>Production du jour :</strong> 
+                                        @snapshot.DailySolarGeneration.ToString("F2") kWh
+                                    </p>
+                                    <p class="card-text">
+                                        <strong>État batterie :</strong> 
+                                        <span>@snapshot.BatterySOC.ToString("F0")% SOC</span>
+                                    </p>
+                                    <p class="card-text">
+                                        <small class="text-muted">
+                                            Dernière mise à jour : @snapshot.SnapshotTime.ToString("G")
+                                        </small>
+                                    </p>
+                                }
+                            }
+
+                            <a href="/site/@site.Id" class="btn btn-sm btn-info mt-3">
+                                <i class="bi bi-zoom-in"></i> Détails
+                            </a>
+                        </div>
+                    </div>
+                </div>
+            }
+        </div>
+    }
+</div>
+
+@code {
+    private List<Site> sites = new();
+    private Dictionary<int, List<SiteDataSnapshot>> lastSnapshots = new();
+    private bool isLoading = true;
+    private string? errorMessage;
+
+    protected override async Task OnInitializedAsync()
+    {
+        try
+        {
+            isLoading = true;
+            sites = await SolarDataService.GetSitesAsync();
+
+            foreach (var site in sites)
+            {
+                var snapshots = await SolarDataService.GetSiteDataSnapshotsAsync(site.Id, 1);
+                lastSnapshots[site.Id] = snapshots;
+            }
+        }
+        catch (Exception ex)
+        {
+            Logger.LogError(ex, "Erreur lors du chargement des données");
+            errorMessage = "Une erreur est survenue lors du chargement des données.";
+        }
+        finally
+        {
+            isLoading = false;
+        }
+    }
+
+    private async Task RefreshData()
+    {
+        isLoading = true;
+        await OnInitializedAsync();
+    }
+}

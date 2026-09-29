@@ -1,0 +1,334 @@
+@page "/releve-quotidien-atmoce"
+@using System.Globalization
+@using AtmoceSolarApp.Data
+@using AtmoceSolarApp.Models
+@using Microsoft.EntityFrameworkCore
+@inject AtmocDbContext DbContext
+@rendermode InteractiveServer
+
+<PageTitle>Relevé quotidien Atmoce</PageTitle>
+
+<div class="container-fluid py-4">
+	<h1 class="mb-4">Relevé quotidien Atmoce</h1>
+
+	@if (isLoading)
+	{
+		<div class="alert alert-info">Chargement...</div>
+	}
+	else if (records.Count == 0)
+	{
+		<div class="alert alert-warning">Aucun relevé disponible.</div>
+	}
+	else
+	{
+		<div class="accordion daily-accordion" id="dailyAccordion">
+			@foreach (var yearGroup in yearGroups)
+			{
+				var isYearExpanded = expandedYears.Contains(yearGroup.Year);
+				<div class="accordion-item daily-accordion-item">
+					<h2 class="accordion-header">
+						<button class="accordion-button @(!isYearExpanded ? "collapsed" : "")" type="button" @onclick="() => ToggleYear(yearGroup.Year)">
+							@yearGroup.Year
+						</button>
+					</h2>
+					<div id="collapse-year-@yearGroup.Year" class="accordion-collapse collapse @(isYearExpanded ? "show" : "")" data-bs-parent="#dailyAccordion">
+						<div class="accordion-body p-0">
+							<div class="accordion daily-accordion" id="dailyAccordion-@yearGroup.Year">
+								@foreach (var monthGroup in yearGroup.Months)
+								{
+									var isMonthExpanded = expandedMonths.Contains(monthGroup.Key);
+									<div class="accordion-item daily-accordion-item">
+										<h2 class="accordion-header">
+											<button class="accordion-button @(!isMonthExpanded ? "collapsed" : "")" type="button" @onclick="() => ToggleMonth(monthGroup.Key)">
+												@monthGroup.DisplayName
+											</button>
+										</h2>
+										<div id="collapse-month-@monthGroup.Key" class="accordion-collapse collapse @(isMonthExpanded ? "show" : "")" data-bs-parent="#dailyAccordion-@yearGroup.Year">
+											<div class="accordion-body p-0">
+												<div class="table-responsive daily-atmoce-wrap">
+													<table class="table table-striped table-sm daily-atmoce-table">
+														<thead>
+															<tr>
+																<th class="sortable">
+																	<button class="sort-button" type="button" @onclick="() => ToggleSortColumn(DailyEnergySortColumn.RecordDate)">
+																		Date <span class="sort-indicator">@GetSortIndicator(DailyEnergySortColumn.RecordDate)</span>
+																	</button>
+																</th>
+																<th class="sortable">
+																	<button class="sort-button" type="button" @onclick="() => ToggleSortColumn(DailyEnergySortColumn.ProducedKwh)">
+																		Produit (kWh) <span class="sort-indicator">@GetSortIndicator(DailyEnergySortColumn.ProducedKwh)</span>
+																	</button>
+																</th>
+																<th class="sortable">
+																	<button class="sort-button" type="button" @onclick="() => ToggleSortColumn(DailyEnergySortColumn.ConsumedKwh)">
+																		Consommé (kWh) <span class="sort-indicator">@GetSortIndicator(DailyEnergySortColumn.ConsumedKwh)</span>
+																	</button>
+																</th>
+																<th class="sortable">
+																	<button class="sort-button" type="button" @onclick="() => ToggleSortColumn(DailyEnergySortColumn.FromGridKwh)">
+																		Depuis réseau (kWh) <span class="sort-indicator">@GetSortIndicator(DailyEnergySortColumn.FromGridKwh)</span>
+																	</button>
+																</th>
+																<th class="sortable">
+																	<button class="sort-button" type="button" @onclick="() => ToggleSortColumn(DailyEnergySortColumn.ToGridKwh)">
+																		Vers réseau (kWh) <span class="sort-indicator">@GetSortIndicator(DailyEnergySortColumn.ToGridKwh)</span>
+																	</button>
+																</th>
+																<th class="sortable">
+																	<button class="sort-button" type="button" @onclick="() => ToggleSortColumn(DailyEnergySortColumn.ChargedKwh)">
+																		Chargé (kWh) <span class="sort-indicator">@GetSortIndicator(DailyEnergySortColumn.ChargedKwh)</span>
+																	</button>
+																</th>
+																<th class="sortable">
+																	<button class="sort-button" type="button" @onclick="() => ToggleSortColumn(DailyEnergySortColumn.DischargedKwh)">
+																		Déchargé (kWh) <span class="sort-indicator">@GetSortIndicator(DailyEnergySortColumn.DischargedKwh)</span>
+																	</button>
+																</th>
+																<th class="sortable">
+																	<button class="sort-button" type="button" @onclick="() => ToggleSortColumn(DailyEnergySortColumn.SocMax)">
+																		SOC max (%) <span class="sort-indicator">@GetSortIndicator(DailyEnergySortColumn.SocMax)</span>
+																	</button>
+																</th>
+																<th class="sortable">
+																	<button class="sort-button" type="button" @onclick="() => ToggleSortColumn(DailyEnergySortColumn.ColumnIValue)">
+																		SOC min (%) <span class="sort-indicator">@GetSortIndicator(DailyEnergySortColumn.ColumnIValue)</span>
+																	</button>
+																</th>
+															</tr>
+														</thead>
+														<tbody>
+															@foreach (var record in monthGroup.Records)
+															{
+																<tr>
+																	<td>@record.RecordDate.ToString("dd/MM/yyyy")</td>
+																	<td>@record.ProducedKwh.ToString("F2")</td>
+																	<td>@record.ConsumedKwh.ToString("F2")</td>
+																	<td>@record.FromGridKwh.ToString("F2")</td>
+																	<td>@record.ToGridKwh.ToString("F2")</td>
+																	<td>@record.ChargedKwh.ToString("F2")</td>
+																	<td>@record.DischargedKwh.ToString("F2")</td>
+																	<td>@record.SocMax.ToString("F0")</td>
+																	<td>@record.ColumnIValue.ToString("F0")</td>
+																</tr>
+															}
+														</tbody>
+													</table>
+												</div>
+											</div>
+										</div>
+									</div>
+								}
+							</div>
+						</div>
+					</div>
+				</div>
+			}
+		</div>
+	}
+</div>
+
+@code {
+	private readonly CultureInfo frCulture = CultureInfo.GetCultureInfo("fr-FR");
+	private List<DailyEnergyRecord> records = new();
+	private List<YearGroup> yearGroups = new();
+	private bool isLoading = true;
+	private DailyEnergySortColumn currentSortColumn = DailyEnergySortColumn.RecordDate;
+	private bool isAscending = false;
+	private HashSet<int> expandedYears = new();
+	private HashSet<string> expandedMonths = new();
+
+	protected override async Task OnInitializedAsync()
+	{
+		await LoadRecords();
+	}
+
+	private async Task LoadRecords()
+	{
+		isLoading = true;
+		try
+		{
+			records = await DbContext.DailyEnergyRecords
+				.OrderByDescending(x => x.RecordDate)
+				.Take(365)
+				.ToListAsync();
+
+			BuildYearGroups();
+
+			expandedYears.Clear();
+			expandedMonths.Clear();
+
+			var today = DateOnly.FromDateTime(DateTime.Now);
+			var currentYearGroup = yearGroups.FirstOrDefault(y => y.Year == today.Year);
+			if (currentYearGroup != null)
+			{
+				expandedYears.Add(currentYearGroup.Year);
+
+				var currentMonthKey = $"{today.Year}-{today.Month:00}";
+				var currentMonthGroup = currentYearGroup.Months.FirstOrDefault(m => m.Key == currentMonthKey);
+				if (currentMonthGroup != null)
+				{
+					expandedMonths.Add(currentMonthGroup.Key);
+				}
+				else if (currentYearGroup.Months.Count > 0)
+				{
+					expandedMonths.Add(currentYearGroup.Months.First().Key);
+				}
+			}
+			else if (yearGroups.Count > 0)
+			{
+				expandedYears.Add(yearGroups.First().Year);
+				if (yearGroups.First().Months.Count > 0)
+				{
+					expandedMonths.Add(yearGroups.First().Months.First().Key);
+				}
+			}
+		}
+		finally
+		{
+			isLoading = false;
+		}
+	}
+
+	private void BuildYearGroups()
+	{
+		yearGroups = records
+			.GroupBy(r => r.RecordDate.Year)
+			.OrderByDescending(g => g.Key)
+			.Select(yearGroup => new YearGroup
+			{
+				Year = yearGroup.Key,
+				Months = yearGroup
+					.GroupBy(r => r.RecordDate.Month)
+					.OrderByDescending(g => g.First().RecordDate)
+					.Select(monthGroup => new MonthGroup
+					{
+						Key = $"{yearGroup.Key}-{monthGroup.Key:00}",
+						DisplayName = CapitalizeFirstLetter(monthGroup.First().RecordDate.ToString("MMMM", frCulture)),
+						Records = SortRecords(monthGroup).ToList()
+					})
+					.ToList()
+			})
+			.ToList();
+	}
+
+	private async Task ToggleSortColumn(DailyEnergySortColumn column)
+	{
+		if (currentSortColumn == column)
+		{
+			isAscending = !isAscending;
+		}
+		else
+		{
+			currentSortColumn = column;
+			isAscending = true;
+		}
+
+		BuildYearGroups();
+		await InvokeAsync(StateHasChanged);
+	}
+
+	private IEnumerable<DailyEnergyRecord> SortRecords(IEnumerable<DailyEnergyRecord> monthRecords)
+	{
+		return currentSortColumn switch
+		{
+			DailyEnergySortColumn.RecordDate => isAscending
+				? monthRecords.OrderBy(x => x.RecordDate).ThenBy(x => x.Id)
+				: monthRecords.OrderByDescending(x => x.RecordDate).ThenByDescending(x => x.Id),
+			DailyEnergySortColumn.ProducedKwh => isAscending
+				? monthRecords.OrderBy(x => x.ProducedKwh).ThenBy(x => x.RecordDate).ThenBy(x => x.Id)
+				: monthRecords.OrderByDescending(x => x.ProducedKwh).ThenByDescending(x => x.RecordDate).ThenByDescending(x => x.Id),
+			DailyEnergySortColumn.ConsumedKwh => isAscending
+				? monthRecords.OrderBy(x => x.ConsumedKwh).ThenBy(x => x.RecordDate).ThenBy(x => x.Id)
+				: monthRecords.OrderByDescending(x => x.ConsumedKwh).ThenByDescending(x => x.RecordDate).ThenByDescending(x => x.Id),
+			DailyEnergySortColumn.FromGridKwh => isAscending
+				? monthRecords.OrderBy(x => x.FromGridKwh).ThenBy(x => x.RecordDate).ThenBy(x => x.Id)
+				: monthRecords.OrderByDescending(x => x.FromGridKwh).ThenByDescending(x => x.RecordDate).ThenByDescending(x => x.Id),
+			DailyEnergySortColumn.ToGridKwh => isAscending
+				? monthRecords.OrderBy(x => x.ToGridKwh).ThenBy(x => x.RecordDate).ThenBy(x => x.Id)
+				: monthRecords.OrderByDescending(x => x.ToGridKwh).ThenByDescending(x => x.RecordDate).ThenByDescending(x => x.Id),
+			DailyEnergySortColumn.ChargedKwh => isAscending
+				? monthRecords.OrderBy(x => x.ChargedKwh).ThenBy(x => x.RecordDate).ThenBy(x => x.Id)
+				: monthRecords.OrderByDescending(x => x.ChargedKwh).ThenByDescending(x => x.RecordDate).ThenByDescending(x => x.Id),
+			DailyEnergySortColumn.DischargedKwh => isAscending
+				? monthRecords.OrderBy(x => x.DischargedKwh).ThenBy(x => x.RecordDate).ThenBy(x => x.Id)
+				: monthRecords.OrderByDescending(x => x.DischargedKwh).ThenByDescending(x => x.RecordDate).ThenByDescending(x => x.Id),
+			DailyEnergySortColumn.SocMax => isAscending
+				? monthRecords.OrderBy(x => x.SocMax).ThenBy(x => x.RecordDate).ThenBy(x => x.Id)
+				: monthRecords.OrderByDescending(x => x.SocMax).ThenByDescending(x => x.RecordDate).ThenByDescending(x => x.Id),
+			DailyEnergySortColumn.ColumnIValue => isAscending
+				? monthRecords.OrderBy(x => x.ColumnIValue).ThenBy(x => x.RecordDate).ThenBy(x => x.Id)
+				: monthRecords.OrderByDescending(x => x.ColumnIValue).ThenByDescending(x => x.RecordDate).ThenByDescending(x => x.Id),
+			_ => monthRecords
+		};
+	}
+
+	private void ToggleYear(int year)
+	{
+		if (expandedYears.Contains(year))
+		{
+			expandedYears.Remove(year);
+		}
+		else
+		{
+			expandedYears.Add(year);
+		}
+	}
+
+	private void ToggleMonth(string month)
+	{
+		if (expandedMonths.Contains(month))
+		{
+			expandedMonths.Remove(month);
+		}
+		else
+		{
+			expandedMonths.Add(month);
+		}
+	}
+
+	private string GetSortIndicator(DailyEnergySortColumn column)
+	{
+		if (currentSortColumn != column)
+		{
+			return "↕";
+		}
+
+		return isAscending ? "▲" : "▼";
+	}
+
+	private string CapitalizeFirstLetter(string value)
+	{
+		if (string.IsNullOrWhiteSpace(value))
+		{
+			return value;
+		}
+
+		return char.ToUpper(value[0], frCulture) + value[1..];
+	}
+
+	private sealed class YearGroup
+	{
+		public int Year { get; set; }
+		public List<MonthGroup> Months { get; set; } = new();
+	}
+
+	private sealed class MonthGroup
+	{
+		public string Key { get; set; } = string.Empty;
+		public string DisplayName { get; set; } = string.Empty;
+		public List<DailyEnergyRecord> Records { get; set; } = new();
+	}
+
+	private enum DailyEnergySortColumn
+	{
+		RecordDate,
+		ProducedKwh,
+		ConsumedKwh,
+		FromGridKwh,
+		ToGridKwh,
+		ChargedKwh,
+		DischargedKwh,
+		SocMax,
+		ColumnIValue
+	}
+}

@@ -1,0 +1,280 @@
+@page "/donnees-ensoleillement"
+@using System.Globalization
+@using AtmoceSolarApp.Services
+@inject ExcelDailyReportService ExcelDailyReportService
+@rendermode InteractiveServer
+
+<PageTitle>Données ensoleillement</PageTitle>
+
+<div class="container-fluid py-4">
+	<h1 class="mb-4">Données ensoleillement</h1>
+
+	@if (isLoading)
+	{
+		<div class="alert alert-info">Chargement...</div>
+	}
+	else if (rows.Count == 0)
+	{
+		<div class="alert alert-warning">Aucune donnée d’ensoleillement disponible.</div>
+	}
+	else
+	{
+		<div class="accordion sunshine-accordion" id="sunshineAccordion">
+			@foreach (var block in blocks)
+			{
+				var isExpanded = expandedBlocks.Contains(block.Title);
+				<div class="accordion-item sunshine-accordion-item">
+					<h2 class="accordion-header">
+						<button 
+							class="accordion-button @(!isExpanded ? "collapsed" : "")" 
+							type="button" 
+							@onclick="@(() => ToggleBlock(block.Title))">
+							@block.Title
+						</button>
+					</h2>
+					<div 
+						id="collapse-@block.Title.Replace(" ", "-")" 
+						class="accordion-collapse collapse @(isExpanded ? "show" : "")" 
+						data-bs-parent="#sunshineAccordion">
+						<div class="accordion-body p-0">
+							<div class="table-responsive">
+								<table class="table table-striped table-sm align-middle sunshine-table">
+									<thead>
+										<tr>
+											<th class="sticky-col">Mois</th>
+											@foreach (var col in block.Columns)
+											{
+												<th>@GetHeader(col.ColumnIndex, col.Fallback)</th>
+											}
+										</tr>
+									</thead>
+									<tbody>
+										@foreach (var row in rows)
+										{
+											var isTotal = IsTotalRow(row);
+											<tr class="@(isTotal ? "table-secondary fw-bold" : string.Empty)">
+												<td class="sticky-col text-start">@GetCell(row, 0)</td>
+												@foreach (var col in block.Columns)
+												{
+													var value = GetCell(row, col.ColumnIndex);
+													var header = GetHeader(col.ColumnIndex, col.Fallback);
+													<td class="@GetCellClass(value, header, col.IsPercent)">@value</td>
+												}
+											</tr>
+										}
+									</tbody>
+								</table>
+							</div>
+						</div>
+					</div>
+				</div>
+			}
+		</div>
+	}
+</div>
+
+@code {
+	private readonly List<BlockConfig> blocks =
+	[
+		new("Théorique initiale",
+		[
+			new(1, "Prod théorique", false),
+			new(2, "Prod théorique (index)", false),
+			new(3, "Conso théorique", false),
+			new(4, "Couverture solaire théorique", true)
+		]),
+		new("2026",
+		[
+			new(5, "Projection prod (kWh)", false),
+			new(6, "Projection prod (index)", false),
+			new(7, "Prod réelle (kWh)", false),
+			new(8, "Prod réelle (index)", false),
+			new(9, "Conso maison (kWh)", false),
+			new(10, "Conso réseau (kWh)", false),
+			new(11, "Couverture solaire réelle", true),
+			new(12, "Conso réseau %", true)
+		]),
+		new("2027",
+		[
+			new(13, "Projection prod (kWh)", false),
+			new(14, "Projection prod (index)", false),
+			new(16, "Prod réelle (kWh)", false),
+			new(17, "Prod réelle (index)", false),
+			new(18, "Conso maison (kWh)", false),
+			new(19, "Conso réseau (kWh)", false),
+			new(20, "Couverture solaire réelle", true),
+			new(21, "Conso réseau %", true)
+		])
+	];
+
+	private List<string> headers = new();
+	private List<List<string>> rows = new();
+	private bool isLoading = true;
+	private HashSet<string> expandedBlocks = new();
+
+	protected override async Task OnInitializedAsync()
+	{
+		var result = await ExcelDailyReportService.ReadSheetContentAsync("Données ensoleillement");
+
+		var filteredRows = new List<List<string>>();
+		foreach (var row in result.Rows)
+		{
+			filteredRows.Add(row);
+			if (IsTotalRow(row))
+			{
+				break;
+			}
+		}
+
+		headers = result.Headers;
+		rows = filteredRows;
+
+		// Expand first block by default
+		if (blocks.Count > 0)
+		{
+			expandedBlocks.Add(blocks[0].Title);
+		}
+
+		isLoading = false;
+	}
+
+	private void ToggleBlock(string blockTitle)
+	{
+		if (expandedBlocks.Contains(blockTitle))
+		{
+			expandedBlocks.Remove(blockTitle);
+		}
+		else
+		{
+			expandedBlocks.Add(blockTitle);
+		}
+	}
+
+	private static string GetCell(IReadOnlyList<string> row, int index)
+		=> index < row.Count ? row[index] : string.Empty;
+
+	private static bool IsTotalRow(IReadOnlyList<string> row)
+		=> row.Count > 0 && row[0].Contains("Total", StringComparison.OrdinalIgnoreCase);
+
+	private string GetHeader(int index, string fallback)
+	{
+		if (index < headers.Count)
+		{
+			var h = headers[index]?.Trim();
+			if (!string.IsNullOrWhiteSpace(h))
+			{
+				return h;
+			}
+		}
+
+		return fallback;
+	}
+
+	private static string GetCellClass(string value, string header, bool isPercentColumn)
+	{
+		var classes = new List<string> { "text-end" };
+
+		if (isPercentColumn || value.Contains('%'))
+		{
+			classes.Add("percent-col");
+
+			// Check for specific column types
+			if (header.Contains("Conso réseau", StringComparison.OrdinalIgnoreCase))
+			{
+				classes.Add(GetConsoReseauClass(value));
+			}
+			else if (header.Contains("Couverture solaire", StringComparison.OrdinalIgnoreCase) || 
+					 header.Contains("Prod réelle", StringComparison.OrdinalIgnoreCase))
+			{
+				classes.Add(GetRedYellowClass(value));
+			}
+			else
+			{
+				classes.Add(GetPercentStateClass(value));
+			}
+		}
+
+		return string.Join(" ", classes.Where(c => !string.IsNullOrWhiteSpace(c)));
+	}
+
+	private static string GetPercentStateClass(string value)
+	{
+		if (string.IsNullOrWhiteSpace(value))
+		{
+			return string.Empty;
+		}
+
+		var normalized = value.Replace("%", string.Empty).Trim();
+		if (!double.TryParse(normalized, NumberStyles.Any, CultureInfo.GetCultureInfo("fr-FR"), out var percent)
+			&& !double.TryParse(normalized, NumberStyles.Any, CultureInfo.InvariantCulture, out percent))
+		{
+			return string.Empty;
+		}
+
+		var delta = percent - 100d;
+		if (delta > 0)
+		{
+			if (delta >= 80) return "percent-high-3";
+			if (delta >= 40) return "percent-high-2";
+			return "percent-high-1";
+		}
+
+		if (delta < 0)
+		{
+			if (delta <= -80) return "percent-low-3";
+			if (delta <= -40) return "percent-low-2";
+			return "percent-low-1";
+		}
+
+		return "percent-equal";
+	}
+
+	private static string GetConsoReseauClass(string value)
+	{
+		if (string.IsNullOrWhiteSpace(value))
+		{
+			return string.Empty;
+		}
+
+		var normalized = value.Replace("%", string.Empty).Trim();
+		if (!double.TryParse(normalized, NumberStyles.Any, CultureInfo.GetCultureInfo("fr-FR"), out var percent)
+			&& !double.TryParse(normalized, NumberStyles.Any, CultureInfo.InvariantCulture, out percent))
+		{
+			return string.Empty;
+		}
+
+		// Conso réseau: rouge foncé (valeur max) vers bleu clair (valeur min)
+		// Supposons une échelle 0-100%
+		if (percent >= 80) return "conso-reseau-high-3";
+		if (percent >= 60) return "conso-reseau-high-2";
+		if (percent >= 40) return "conso-reseau-mid";
+		if (percent >= 20) return "conso-reseau-low-2";
+		return "conso-reseau-low-3";
+	}
+
+	private static string GetRedYellowClass(string value)
+	{
+		if (string.IsNullOrWhiteSpace(value))
+		{
+			return string.Empty;
+		}
+
+		var normalized = value.Replace("%", string.Empty).Trim();
+		if (!double.TryParse(normalized, NumberStyles.Any, CultureInfo.GetCultureInfo("fr-FR"), out var percent)
+			&& !double.TryParse(normalized, NumberStyles.Any, CultureInfo.InvariantCulture, out percent))
+		{
+			return string.Empty;
+		}
+
+		// Couverture solaire et Prod réelle: rouge (valeur min) vers jaune (valeur max)
+		// Supposons une échelle 0-100%
+		if (percent >= 80) return "red-yellow-high-3";
+		if (percent >= 60) return "red-yellow-high-2";
+		if (percent >= 40) return "red-yellow-mid";
+		if (percent >= 20) return "red-yellow-low-2";
+		return "red-yellow-low-3";
+	}
+
+	private sealed record ColumnConfig(int ColumnIndex, string Fallback, bool IsPercent);
+	private sealed record BlockConfig(string Title, List<ColumnConfig> Columns);
+}

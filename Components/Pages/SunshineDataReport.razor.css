@@ -1,0 +1,230 @@
+.sunshine-accordion {
+    border: 1px solid #dee2e6;
+    border-radius: 0.375rem;
+    margin-bottom: 2rem;
+}
+
+.sunshine-accordion-item {
+    border-bottom: 1px solid #dee2e6;
+}
+
+.sunshine-accordion-item:last-child {
+    border-bottom: none;
+}
+
+.sunshine-accordion .accordion-header {
+    margin-bottom: 0;
+}
+
+.sunshine-accordion .accordion-button {
+    padding: 1rem 1.5rem;
+    background-color: #0b3b66;
+    color: #fff;
+    font-size: 1rem;
+    font-weight: 600;
+    border: none;
+    border-radius: 0;
+    box-shadow: none;
+    text-align: left;
+}
+
+.sunshine-accordion .accordion-button:not(.collapsed) {
+    background-color: #0a2d4d;
+    color: #fff;
+    box-shadow: none;
+}
+
+.sunshine-accordion .accordion-button:hover {
+    background-color: #0a2d4d;
+    color: #fff;
+}
+
+.sunshine-accordion .accordion-button:focus {
+    outline: none;
+    box-shadow: none;
+    background-color: #0a2d4d;
+    color: #fff;
+}
+
+.sunshine-accordion .accordion-button::after {
+    background-image: url("data:image/svg+xml,%3csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 16 16' fill='%23fff'%3e%3cpath fill-rule='evenodd' d='M1.646 4.646a.5.5 0 0 1 .708 0L8 10.293l5.646-5.647a.5.5 0 0 1 .708.708l-6 6a.5.5 0 0 1-.708 0l-6-6a.5.5 0 0 1 0-.708z'/%3e%3c/svg%3e");
+}
+
+.sunshine-accordion .accordion-body {
+    padding: 0;
+    border-top: 1px solid #dee2e6;
+}
+
+.sunshine-accordion .table-responsive {
+    width: 100%;
+    min-width: 0;
+}
+
+@media (max-width: 1200px) {
+    .sunshine-accordion .table-responsive {
+        width: 100%;
+    }
+}
+
+.sunshine-section {
+    margin-bottom: 2rem;
+}
+
+.sunshine-table {
+    font-size: 0.9rem;
+    white-space: nowrap;
+    width: 100%;
+    table-layout: auto;
+    border-collapse: collapse;
+}
+
+.sunshine-table thead tr {
+    background-color: #0b3b66;
+}
+
+.sunshine-table thead th {
+    background-color: #0b3b66;
+    color: #fff;
+    border-color: #295a85;
+    vertical-align: middle;
+    padding: 0.75rem;
+    text-align: right;
+    font-weight: 600;
+}
+
+.sunshine-table thead th:first-child,
+.sunshine-table thead .sticky-col {
+    text-align: left;
+}
+
+.sunshine-table td,
+.sunshine-table th {
+    padding: 0.5rem 0.75rem;
+    border: 1px solid #dee2e6;
+}
+
+.sunshine-table tbody td {
+    text-align: right;
+}
+
+.sunshine-table tbody td:first-child,
+.sunshine-table tbody .sticky-col {
+    text-align: left;
+}
+
+.sunshine-table .sticky-col {
+    position: sticky;
+    left: 0;
+    z-index: 2;
+    background: #fff;
+    font-weight: 600;
+}
+
+.sunshine-table thead .sticky-col {
+    z-index: 3;
+    background-color: #0b3b66;
+    color: #fff;
+}
+
+.sunshine-table .group-separator {
+    border-right: 2px solid #5d7894;
+}
+
+.sunshine-table .percent-col {
+    font-weight: 600;
+}
+
+.sunshine-table .percent-high-1 {
+    color: #1b7f3a;
+    background-color: #eefaf2;
+}
+
+.sunshine-table .percent-high-2 {
+    color: #146c2e;
+    background-color: #dcf3e5;
+}
+
+.sunshine-table .percent-high-3 {
+    color: #0f5a25;
+    background-color: #c7ead4;
+}
+
+.sunshine-table .percent-low-1 {
+    color: #b42318;
+    background-color: #fff2f1;
+}
+
+.sunshine-table .percent-low-2 {
+    color: #951f16;
+    background-color: #ffe3e1;
+}
+
+.sunshine-table .percent-low-3 {
+    color: #7a1912;
+    background-color: #ffd1cd;
+}
+
+.sunshine-table .percent-equal {
+    color: #0c4775;
+    background-color: #eef5ff;
+}
+
+/* Conso réseau: rouge foncé (max) vers bleu clair (min) */
+.sunshine-table .conso-reseau-high-3 {
+    color: #fff;
+    background-color: #8b0000;
+}
+
+.sunshine-table .conso-reseau-high-2 {
+    color: #fff;
+    background-color: #b22222;
+}
+
+.sunshine-table .conso-reseau-mid {
+    color: #333;
+    background-color: #daa8a8;
+}
+
+.sunshine-table .conso-reseau-low-2 {
+    color: #0c4775;
+    background-color: #add8e6;
+}
+
+.sunshine-table .conso-reseau-low-3 {
+    color: #0c4775;
+    background-color: #87ceeb;
+}
+
+/* Couverture solaire et Prod réelle: rouge (min) vers jaune (max) */
+.sunshine-table .red-yellow-low-3 {
+    color: #fff;
+    background-color: #dc143c;
+}
+
+.sunshine-table .red-yellow-low-2 {
+    color: #333;
+    background-color: #ff6b6b;
+}
+
+.sunshine-table .red-yellow-mid {
+    color: #333;
+    background-color: #ffa500;
+}
+
+.sunshine-table .red-yellow-high-2 {
+    color: #333;
+    background-color: #ffdb4d;
+}
+
+.sunshine-table .red-yellow-high-3 {
+    color: #333;
+    background-color: #ffff00;
+}
+
+.sunshine-table tbody tr:hover {
+    background-color: #f3f8ff;
+}
+
+.sunshine-table tbody tr.table-secondary {
+    background-color: #e9eef5 !important;
+}

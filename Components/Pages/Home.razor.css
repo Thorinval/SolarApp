@@ -1,0 +1,127 @@
+.navigation-tiles {
+    margin-bottom: 2rem;
+}
+
+.navigation-tiles h2 {
+    font-size: 1.5rem;
+    font-weight: 600;
+    color: #0b3b66;
+    margin-bottom: 1.5rem;
+}
+
+.tiles-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(250px, 1fr));
+    gap: 1.5rem;
+    margin-bottom: 2rem;
+}
+
+.nav-tile {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    gap: 1rem;
+    padding: 2rem 1.5rem;
+    background: linear-gradient(135deg, #0b3b66 0%, #0a2d4d 100%);
+    color: #fff;
+    text-decoration: none;
+    border-radius: 0.5rem;
+    transition: all 0.3s ease;
+    box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1);
+    text-align: center;
+    min-height: 200px;
+}
+
+.nav-tile:hover {
+    transform: translateY(-5px);
+    box-shadow: 0 8px 16px rgba(11, 59, 102, 0.3);
+    color: #fff;
+    text-decoration: none;
+    background: linear-gradient(135deg, #0a2d4d 0%, #081f38 100%);
+}
+
+.nav-tile:active {
+    transform: translateY(-2px);
+}
+
+.tile-icon {
+    font-size: 3rem;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+}
+
+.tile-icon i {
+    color: #ffc107;
+    text-shadow: 0 2px 4px rgba(0, 0, 0, 0.3);
+}
+
+.tile-content h3 {
+    font-size: 1.1rem;
+    font-weight: 600;
+    margin: 0;
+    color: #fff;
+}
+
+.tile-content p {
+    font-size: 0.85rem;
+    margin: 0.5rem 0 0 0;
+    opacity: 0.9;
+    color: #e0e0e0;
+}
+
+/* Responsive design */
+@media (max-width: 768px) {
+    .tiles-grid {
+        grid-template-columns: repeat(auto-fill, minmax(200px, 1fr));
+        gap: 1rem;
+    }
+
+    .nav-tile {
+        padding: 1.5rem 1rem;
+        min-height: 180px;
+    }
+
+    .tile-icon {
+        font-size: 2.5rem;
+    }
+
+    .tile-content h3 {
+        font-size: 1rem;
+    }
+}
+
+@media (max-width: 480px) {
+    .tiles-grid {
+        grid-template-columns: 1fr;
+    }
+
+    .navigation-tiles h2 {
+        font-size: 1.2rem;
+    }
+
+    .nav-tile {
+        flex-direction: row;
+        text-align: left;
+        min-height: auto;
+        gap: 1rem;
+    }
+
+    .tile-icon {
+        font-size: 2rem;
+        flex-shrink: 0;
+    }
+
+    .tile-content {
+        flex: 1;
+    }
+
+    .tile-content h3 {
+        font-size: 1rem;
+    }
+
+    .tile-content p {
+        font-size: 0.75rem;
+    }
+}

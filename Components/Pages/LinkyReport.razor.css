@@ -1,0 +1,40 @@
+.daily-atmoce-wrap {
+    width: 100%;
+}
+
+.daily-atmoce-table {
+    width: 100%;
+    table-layout: auto;
+    border-collapse: collapse;
+}
+
+.daily-atmoce-table thead tr {
+    background-color: #0b3b66;
+}
+
+.daily-atmoce-table thead th {
+    background-color: #0b3b66;
+    color: #fff;
+    border-color: #295a85;
+    font-weight: 600;
+    padding: 0.75rem;
+    text-align: right;
+}
+
+.daily-atmoce-table thead th:first-child {
+    text-align: left;
+}
+
+.daily-atmoce-table tbody td {
+    padding: 0.5rem 0.75rem;
+    border: 1px solid #dee2e6;
+}
+
+.daily-atmoce-table tbody td:first-child {
+    text-align: left;
+    width: 120px;
+}
+
+.daily-atmoce-table tbody td:not(:first-child) {
+    text-align: right;
+}

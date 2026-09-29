@@ -1,0 +1,86 @@
+@page "/releve-linky"
+@using System.Globalization
+@using AtmoceSolarApp.Services
+@inject ExcelDailyReportService ExcelDailyReportService
+@rendermode InteractiveServer
+
+<PageTitle>Relevé Linky</PageTitle>
+
+<div class="container-fluid py-4">
+	<h1 class="mb-4">Relevé Linky</h1>
+
+	@if (isLoading)
+	{
+		<div class="alert alert-info">Chargement...</div>
+	}
+	else if (rows.Count == 0)
+	{
+		<div class="alert alert-warning">Aucun relevé Linky disponible.</div>
+	}
+	else
+	{
+		<div class="table-responsive daily-atmoce-wrap">
+			<table class="table table-striped table-sm daily-atmoce-table">
+				<thead>
+					<tr>
+						@foreach (var header in headers)
+						{
+							<th>@header</th>
+						}
+					</tr>
+				</thead>
+				<tbody>
+					@foreach (var row in rows)
+					{
+						<tr>
+							@for (var i = 0; i < row.Count; i++)
+							{
+								<td>@FormatLinkyCell(i, row[i])</td>
+							}
+						</tr>
+					}
+				</tbody>
+			</table>
+		</div>
+	}
+</div>
+
+@code {
+	private List<string> headers = new();
+	private List<List<string>> rows = new();
+	private bool isLoading = true;
+
+	protected override async Task OnInitializedAsync()
+	{
+		var result = await ExcelDailyReportService.ReadSheetContentAsync("Relevé Linky");
+		headers = result.Headers;
+		rows = result.Rows;
+		isLoading = false;
+	}
+
+	private static string FormatLinkyCell(int columnIndex, string value)
+	{
+		if (string.IsNullOrWhiteSpace(value))
+		{
+			return value;
+		}
+
+		var trimmed = value.Trim();
+		var looksLikeDate = trimmed.Contains('/') || trimmed.Contains('-') || trimmed.Contains('.');
+		if (!looksLikeDate)
+		{
+			return value;
+		}
+
+		if (DateTime.TryParse(trimmed, CultureInfo.GetCultureInfo("fr-FR"), DateTimeStyles.None, out var date)
+			|| DateTime.TryParse(trimmed, CultureInfo.InvariantCulture, DateTimeStyles.None, out date))
+		{
+			var hasTime = date.TimeOfDay != TimeSpan.Zero;
+			return hasTime
+				? date.ToString("dd/MM/yyyy HH:mm", CultureInfo.GetCultureInfo("fr-FR"))
+				: date.ToString("dd/MM/yyyy", CultureInfo.GetCultureInfo("fr-FR"));
+		}
+
+		return value;
+	}
+}

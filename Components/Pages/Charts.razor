@@ -1,0 +1,684 @@
+@page "/graphiques"
+@rendermode InteractiveServer
+@using System.Globalization
+@using System.Text.RegularExpressions
+@using AtmoceSolarApp.Data
+@using AtmoceSolarApp.Services
+@using Microsoft.EntityFrameworkCore
+@inject AtmocDbContext DbContext
+@inject ExcelDailyReportService ExcelDailyReportService
+@inject IJSRuntime JS
+
+<PageTitle>Graphiques</PageTitle>
+
+<div class="container-fluid py-4">
+	<h1 class="mb-4">Graphiques</h1>
+
+	@if (isLoading)
+	{
+		<div class="alert alert-info">Chargement des données...</div>
+	}
+	else if (labels.Count == 0 && ecowattLabels.Count == 0)
+	{
+		<div class="alert alert-warning">Aucune donnée exploitable pour le graphique.</div>
+	}
+	else if (!string.IsNullOrWhiteSpace(renderError))
+	{
+		<div class="alert alert-danger">Erreur rendu graphique : @renderError</div>
+	}
+	else
+	{
+		<div class="charts-grid">
+			<div class="chart-panel chart-full-width">
+				<canvas @ref="ecowattMonthlyBillCanvas"></canvas>
+			</div>
+
+			<div class="chart-panel">
+				<canvas @ref="monthlyProductionCanvas"></canvas>
+			</div>
+
+			<div class="chart-panel">
+				<canvas @ref="projectionVsRealIndexCanvas"></canvas>
+			</div>
+
+			<div class="chart-panel chart-full-width">
+				@if (HasBilanYearSelection)
+				{
+					<div class="chart-toolbar">
+						<label for="energyYearSelect" class="form-label mb-0">Année</label>
+						<select id="energyYearSelect" class="form-select form-select-sm year-select" value="@selectedBilanYear" @onchange="OnBilanYearChanged">
+							@foreach (var year in availableBilanYears)
+							{
+								<option value="@year">@year</option>
+							}
+						</select>
+					</div>
+				}
+				<canvas @ref="energyDistributionCanvas"></canvas>
+			</div>
+		</div>
+
+		@if (!string.IsNullOrWhiteSpace(renderStatus))
+		{
+			<div class="alert alert-secondary mt-3">@renderStatus</div>
+		}
+	}
+</div>
+
+@code {
+	private ElementReference monthlyProductionCanvas;
+	private ElementReference projectionVsRealIndexCanvas;
+	private ElementReference energyDistributionCanvas;
+	private ElementReference ecowattMonthlyBillCanvas;
+	private bool isLoading = true;
+	private bool chartRendered;
+	private string? renderError;
+	private string? renderStatus;
+
+	private readonly List<string> labels = new();
+	private readonly List<double?> theoretical = new();
+	private readonly List<double?> real2026 = new();
+	private readonly List<double?> projection2026 = new();
+	private readonly List<double?> real2027 = new();
+	private readonly List<double?> projection2027 = new();
+	private readonly List<double?> projectionIndex2026 = new();
+	private readonly List<double?> realIndex2026 = new();
+	private readonly List<double?> projectionIndex2027 = new();
+	private readonly List<double?> realIndex2027 = new();
+
+	private readonly List<string> ecowattLabels = new();
+	private readonly List<double?> ecowattBill2025 = new();
+	private readonly List<double?> ecowattBill2026 = new();
+	private readonly List<double?> autonomySolar = new();
+	private int? autonomyYear;
+	private readonly Dictionary<(int Year, int Month), double> ecowattMonthlyBills = new();
+
+	// Répartition des sources d'énergie (Bilan énergie sheet)
+	private readonly List<BilanRowData> bilanData = new();
+	private readonly List<int> availableBilanYears = new();
+	private int selectedBilanYear;
+	private bool HasBilanYearSelection => availableBilanYears.Count > 0;
+
+	protected override async Task OnInitializedAsync()
+	{
+		var result = await ExcelDailyReportService.ReadSheetContentAsync("Données ensoleillement");
+
+		foreach (var row in result.Rows)
+		{
+			if (row.Count == 0)
+			{
+				continue;
+			}
+
+			var month = GetCell(row, 0);
+			if (string.IsNullOrWhiteSpace(month))
+			{
+				continue;
+			}
+
+			if (month.Contains("Total", StringComparison.OrdinalIgnoreCase))
+			{
+				break;
+			}
+
+			labels.Add(month);
+			theoretical.Add(ParseKwh(GetCell(row, 1)));      // B
+			projection2026.Add(ParseKwh(GetCell(row, 5)));   // F
+			real2026.Add(ParseKwh(GetCell(row, 7)));         // H
+			projection2027.Add(ParseKwh(GetCell(row, 13)));  // N
+			real2027.Add(ParseKwh(GetCell(row, 16)));        // Q
+			projectionIndex2026.Add(ParseNumber(GetCell(row, 6)));  // G
+			realIndex2026.Add(ParseNumber(GetCell(row, 8)));        // I
+			projectionIndex2027.Add(ParseNumber(GetCell(row, 14))); // O
+			realIndex2027.Add(ParseNumber(GetCell(row, 17)));       // R
+		}
+
+		await LoadEcowattMonthlyBillsAsync();
+		await LoadMonthlyAutonomyAsync();
+
+		// Charger les données du Bilan énergie pour la répartition
+		var bilanResult = await ExcelDailyReportService.ReadSheetContentAsync("Bilan énergie", 16);
+		foreach (var row in bilanResult.Rows)
+		{
+			if (row.Count == 0)
+			{
+				continue;
+			}
+
+			var month = GetCell(row, 1);  // Colonne B (index 1)
+			if (string.IsNullOrWhiteSpace(month) || month.Contains("cumul", StringComparison.OrdinalIgnoreCase))
+			{
+				continue;
+			}
+
+			if (month.Contains("Total", StringComparison.OrdinalIgnoreCase))
+			{
+				break;
+			}
+
+			var year = ExtractYearFromLabel(month) ?? ExtractYearFromLabel(GetCell(row, 0));
+
+			var consoTotale = ParseEnergyValue(GetCell(row, 9));       // J
+			var reseauKwh = ParseEnergyValue(GetCell(row, 12));        // M
+			var batterieKwh = ParseEnergyValue(GetCell(row, 7));       // H
+			var venteKwh = ParseEnergyValue(GetCell(row, 6));           // G
+			var solaireKwh = ParseEnergyValue(GetCell(row, 13));       // N
+
+			bilanData.Add(new BilanRowData(
+				label: month,
+				year: year,
+				consoReseau: CalculatePercent(reseauKwh, consoTotale),
+				soutirerBatterie: CalculatePercent(batterieKwh, consoTotale),
+				venteKwh: venteKwh,
+				consoSolaire: CalculatePercent(solaireKwh, consoTotale)));
+		}
+
+		AssignMissingBilanYears();
+
+		availableBilanYears.Clear();
+		availableBilanYears.AddRange(bilanData
+			.Where(d => d.Year.HasValue)
+			.Select(d => d.Year!.Value)
+			.Distinct()
+			.OrderBy(y => y));
+
+		if (availableBilanYears.Count > 0)
+		{
+			selectedBilanYear = availableBilanYears.Contains(DateTime.Now.Year)
+				? DateTime.Now.Year
+				: availableBilanYears[^1];
+		}
+
+		isLoading = false;
+	}
+
+	private async Task LoadEcowattMonthlyBillsAsync()
+	{
+		ecowattMonthlyBills.Clear();
+		ecowattLabels.Clear();
+		ecowattBill2025.Clear();
+		ecowattBill2026.Clear();
+
+		var ecowattResult = await ExcelDailyReportService.ReadSheetContentAsync("Relevé Ecowatt", 11);
+		var factureIndex = ecowattResult.Headers.FindIndex(h => h.Contains("Facture", StringComparison.OrdinalIgnoreCase));
+		if (factureIndex < 0)
+		{
+			BuildEcowattMonthlyBillSeries();
+			return;
+		}
+
+		int? currentYear = null;
+		foreach (var row in ecowattResult.Rows)
+		{
+			if (row.Count == 0)
+			{
+				continue;
+			}
+
+			var rowYear = GetCell(row, 0);
+			var month = GetCell(row, 1);
+
+			if (string.IsNullOrWhiteSpace(month))
+			{
+				continue;
+			}
+
+			if (rowYear.Contains("Total", StringComparison.OrdinalIgnoreCase)
+				|| month.Contains("Total", StringComparison.OrdinalIgnoreCase))
+			{
+				break;
+			}
+
+			if (rowYear.Contains("cumul", StringComparison.OrdinalIgnoreCase)
+				|| month.Contains("cumul", StringComparison.OrdinalIgnoreCase))
+			{
+				continue;
+			}
+
+			var yearFromLabel = ExtractYearFromLabel(rowYear);
+			if (yearFromLabel.HasValue)
+			{
+				currentYear = yearFromLabel.Value;
+			}
+			else if (int.TryParse(rowYear, out var parsedYear))
+			{
+				currentYear = parsedYear;
+			}
+
+			if (!currentYear.HasValue || (currentYear.Value != 2025 && currentYear.Value != 2026))
+			{
+				continue;
+			}
+
+			var monthRank = GetMonthRank(month);
+			if (monthRank == 0)
+			{
+				continue;
+			}
+
+			var facture = ParseCurrencyValue(GetCell(row, factureIndex));
+			if (!facture.HasValue)
+			{
+				continue;
+			}
+
+			ecowattMonthlyBills[(currentYear.Value, monthRank)] = facture.Value;
+		}
+
+		BuildEcowattMonthlyBillSeries();
+	}
+
+	private async Task LoadMonthlyAutonomyAsync()
+	{
+		autonomySolar.Clear();
+		autonomyYear = null;
+
+		var years = await DbContext.DailyEnergyRecords
+			.AsNoTracking()
+			.Select(r => r.RecordDate.Year)
+			.Distinct()
+			.OrderBy(y => y)
+			.ToListAsync();
+
+		if (years.Count == 0)
+		{
+			for (var month = 1; month <= 12; month++)
+			{
+				autonomySolar.Add(null);
+			}
+
+			return;
+		}
+
+		autonomyYear = years[^1];
+		var monthlyValues = await DbContext.DailyEnergyRecords
+			.AsNoTracking()
+			.Where(r => r.RecordDate.Year == autonomyYear.Value)
+			.GroupBy(r => r.RecordDate.Month)
+			.Select(g => new
+			{
+				Month = g.Key,
+				Consumed = g.Sum(x => x.ConsumedKwh),
+				FromGrid = g.Sum(x => x.FromGridKwh)
+			})
+			.ToListAsync();
+
+		var valuesByMonth = monthlyValues.ToDictionary(x => x.Month, x => CalculatePercent(x.FromGrid, x.Consumed));
+		for (var month = 1; month <= 12; month++)
+		{
+			autonomySolar.Add(valuesByMonth.TryGetValue(month, out var value) ? value : null);
+		}
+	}
+
+	private void BuildEcowattMonthlyBillSeries()
+	{
+		ecowattLabels.Clear();
+		ecowattBill2025.Clear();
+		ecowattBill2026.Clear();
+
+		for (var month = 1; month <= 12; month++)
+		{
+			ecowattLabels.Add(GetEcowattMonthLabel(month));
+			ecowattBill2025.Add(GetEcowattBillValue(2025, month));
+			ecowattBill2026.Add(GetEcowattBillValue(2026, month));
+		}
+	}
+
+	private double? GetEcowattBillValue(int year, int month)
+	{
+		return ecowattMonthlyBills.TryGetValue((year, month), out var value) ? value : null;
+	}
+
+	private static string GetEcowattMonthLabel(int month)
+	{
+		return month switch
+		{
+			1 => "Janv",
+			2 => "Févr",
+			3 => "Mars",
+			4 => "Avr",
+			5 => "Mai",
+			6 => "Juin",
+			7 => "Juil",
+			8 => "Août",
+			9 => "Sept",
+			10 => "Oct",
+			11 => "Nov",
+			12 => "Déc",
+			_ => string.Empty
+		};
+	}
+
+
+	protected override async Task OnAfterRenderAsync(bool firstRender)
+	{
+		if (chartRendered || isLoading || (labels.Count == 0 && ecowattLabels.Count == 0 && bilanData.Count == 0))
+		{
+			return;
+		}
+
+		try
+		{
+			var status1 = await JS.InvokeAsync<string>("solarCharts.renderMonthlyProductionChart", monthlyProductionCanvas, new
+			{
+				labels,
+				theoretical,
+				real2026,
+				projection2026,
+				real2027,
+				projection2027
+			});
+
+			var status2 = await JS.InvokeAsync<string>("solarCharts.renderProjectionVsRealIndexChart", projectionVsRealIndexCanvas, new
+			{
+				labels,
+				projectionIndex2026,
+				realIndex2026,
+				projectionIndex2027,
+				realIndex2027
+			});
+
+			var status3 = await RenderEnergyDistributionChartAsync();
+			var status4 = await RenderEcowattMonthlyBillChartAsync();
+
+			renderStatus = $"Graph1: {status1} | Graph2: {status2} | Graph3: {status3} | Graph4: {status4}";
+			chartRendered = true;
+			StateHasChanged();
+		}
+		catch (Exception ex)
+		{
+			renderError = ex.Message;
+			StateHasChanged();
+		}
+	}
+
+	private async Task OnBilanYearChanged(ChangeEventArgs e)
+	{
+		if (int.TryParse(Convert.ToString(e.Value, CultureInfo.InvariantCulture), out var year))
+		{
+			selectedBilanYear = year;
+		}
+
+		if (!isLoading && chartRendered)
+		{
+			var status3 = await RenderEnergyDistributionChartAsync();
+			renderStatus = $"Graph3: {status3}";
+			StateHasChanged();
+		}
+	}
+
+	private async Task<string> RenderEnergyDistributionChartAsync()
+	{
+		var filtered = HasBilanYearSelection && selectedBilanYear > 0
+			? bilanData.Where(d => d.Year == selectedBilanYear).ToList()
+			: bilanData;
+
+		if (filtered.Count == 0)
+		{
+			filtered = bilanData;
+		}
+
+		return await JS.InvokeAsync<string>("solarCharts.renderEnergyDistributionChart", energyDistributionCanvas, new
+		{
+			labels = filtered.Select(d => d.Label).ToList(),
+			consoReseau = filtered.Select(d => d.ConsoReseau).ToList(),
+			soutirerBatterie = filtered.Select(d => d.SoutirerBatterie).ToList(),
+			consoSolaire = filtered.Select(d => d.ConsoSolaire).ToList()
+		});
+	}
+
+	private async Task<string> RenderEcowattMonthlyBillChartAsync()
+	{
+		var latestBilanYear = availableBilanYears.Count > 0 ? availableBilanYears[^1] : (int?)null;
+		var venteByMonth = Enumerable.Range(1, 12)
+			.Select(month => latestBilanYear.HasValue
+				? bilanData.FirstOrDefault(d => d.Year == latestBilanYear.Value && GetMonthRank(d.Label) == month)?.VenteKwh is double vente
+					? -Math.Abs(vente)
+					: (double?)null
+				: (double?)null)
+			.ToList();
+
+		return await JS.InvokeAsync<string>("solarCharts.renderBillEvolutionChart", ecowattMonthlyBillCanvas, new
+		{
+			title = "Evolution du montant des factures mensuelles",
+			labels = ecowattLabels,
+			barValueSuffix = " €",
+			barValueDecimals = 0,
+			lineValueSuffix = " %",
+			lineValueDecimals = 0,
+			rightAxisMin = 0,
+			rightAxisMax = 100,
+			barSeries = new[]
+			{
+				new { name = "Facture 2025", values = ecowattBill2025, color = "#1f5d86" },
+				new { name = "Facture 2026", values = ecowattBill2026, color = "#ed7d31" },
+				new { name = "Vente kWh", values = venteByMonth, color = "#2f9e44" }
+			},
+			lineSeries = new[]
+			{
+				new { name = autonomyYear.HasValue ? $"Autonomie solaire {autonomyYear.Value}" : "Autonomie solaire", values = autonomySolar, color = "#7030a0" }
+			}
+		});
+	}
+
+	private static int? ExtractYearFromLabel(string raw)
+	{
+		if (string.IsNullOrWhiteSpace(raw))
+		{
+			return null;
+		}
+
+		var fullYear = Regex.Match(raw, "(?<!\\d)(20\\d{2})(?!\\d)");
+		if (fullYear.Success && int.TryParse(fullYear.Groups[1].Value, out var yyyy))
+		{
+			return yyyy;
+		}
+
+		var shortYear = Regex.Match(raw, "(?<!\\d)(\\d{2})(?!\\d)");
+		if (shortYear.Success && int.TryParse(shortYear.Groups[1].Value, out var yy))
+		{
+			return 2000 + yy;
+		}
+
+		return null;
+	}
+
+	private void AssignMissingBilanYears()
+	{
+		if (bilanData.Count == 0)
+		{
+			return;
+		}
+
+		if (bilanData.Any(d => d.Year.HasValue))
+		{
+			int? currentYear = null;
+			foreach (var row in bilanData)
+			{
+				if (row.Year.HasValue)
+				{
+					currentYear = row.Year;
+				}
+				else if (currentYear.HasValue)
+				{
+					row.Year = currentYear;
+				}
+			}
+
+			for (var i = bilanData.Count - 1; i >= 0; i--)
+			{
+				if (bilanData[i].Year.HasValue)
+				{
+					currentYear = bilanData[i].Year;
+				}
+				else if (currentYear.HasValue)
+				{
+					bilanData[i].Year = currentYear;
+				}
+			}
+
+			return;
+		}
+
+		var inferredYear = DateTime.Now.Year;
+		var previousMonthRank = 0;
+		foreach (var row in bilanData)
+		{
+			var monthRank = GetMonthRank(row.Label);
+			if (previousMonthRank > 0 && monthRank > 0 && monthRank < previousMonthRank)
+			{
+				inferredYear++;
+			}
+
+			row.Year = inferredYear;
+			if (monthRank > 0)
+			{
+				previousMonthRank = monthRank;
+			}
+		}
+	}
+
+	private static int GetMonthRank(string label)
+	{
+		if (string.IsNullOrWhiteSpace(label))
+		{
+			return 0;
+		}
+
+		var value = label.Trim().ToLowerInvariant();
+		if (value.StartsWith("jan")) return 1;
+		if (value.StartsWith("fév") || value.StartsWith("fev")) return 2;
+		if (value.StartsWith("mar")) return 3;
+		if (value.StartsWith("avr")) return 4;
+		if (value.StartsWith("mai")) return 5;
+		if (value.StartsWith("juin")) return 6;
+		if (value.StartsWith("juil")) return 7;
+		if (value.StartsWith("aoû") || value.StartsWith("aou")) return 8;
+		if (value.StartsWith("sep")) return 9;
+		if (value.StartsWith("oct")) return 10;
+		if (value.StartsWith("nov")) return 11;
+		if (value.StartsWith("déc") || value.StartsWith("dec")) return 12;
+		return 0;
+	}
+
+	private sealed class BilanRowData
+	{
+		public BilanRowData(string label, int? year, double? consoReseau, double? soutirerBatterie, double? venteKwh, double? consoSolaire)
+		{
+			Label = label;
+			Year = year;
+			ConsoReseau = consoReseau;
+			SoutirerBatterie = soutirerBatterie;
+			VenteKwh = venteKwh;
+			ConsoSolaire = consoSolaire;
+		}
+
+		public string Label { get; }
+		public int? Year { get; set; }
+		public double? ConsoReseau { get; }
+		public double? SoutirerBatterie { get; }
+		public double? VenteKwh { get; }
+		public double? ConsoSolaire { get; }
+	}
+
+	private static string GetCell(IReadOnlyList<string> row, int index)
+		=> index < row.Count ? row[index] : string.Empty;
+
+	private static double? ParseKwh(string raw)
+	{
+		if (string.IsNullOrWhiteSpace(raw))
+		{
+			return null;
+		}
+
+		var value = raw
+			.Replace("kWh", string.Empty, StringComparison.OrdinalIgnoreCase)
+			.Replace(" ", string.Empty)
+			.Replace("\u00A0", string.Empty)
+			.Trim();
+
+		return ParseNumber(value);
+	}
+
+	private static double? ParseEnergyValue(string raw)
+	{
+		if (string.IsNullOrWhiteSpace(raw))
+		{
+			return null;
+		}
+
+		var value = raw;
+		var parenthesisIndex = value.IndexOf('(');
+		if (parenthesisIndex >= 0)
+		{
+			value = value[..parenthesisIndex];
+		}
+
+		value = value
+			.Replace("kWh", string.Empty, StringComparison.OrdinalIgnoreCase)
+			.Replace("%", string.Empty)
+			.Replace("€", string.Empty)
+			.Replace("EUR", string.Empty, StringComparison.OrdinalIgnoreCase)
+			.Replace("euro", string.Empty, StringComparison.OrdinalIgnoreCase)
+			.Replace(" ", string.Empty)
+			.Replace("\u00A0", string.Empty)
+			.Trim();
+
+		return ParseNumber(value);
+	}
+
+	private static double? ParseCurrencyValue(string raw)
+	{
+		if (string.IsNullOrWhiteSpace(raw))
+		{
+			return null;
+		}
+
+		var value = raw
+			.Replace("€", string.Empty)
+			.Replace("EUR", string.Empty, StringComparison.OrdinalIgnoreCase)
+			.Replace("euro", string.Empty, StringComparison.OrdinalIgnoreCase)
+			.Replace(" ", string.Empty)
+			.Replace("\u00A0", string.Empty)
+			.Trim();
+
+		return ParseNumber(value);
+	}
+
+	private static double? CalculatePercent(double? part, double? total)
+	{
+		if (!part.HasValue || !total.HasValue || total.Value <= 0)
+		{
+			return null;
+		}
+
+		return (part.Value / total.Value) * 100d;
+	}
+
+	private static double? ParseNumber(string raw)
+	{
+		if (string.IsNullOrWhiteSpace(raw))
+		{
+			return null;
+		}
+
+		var value = raw
+			.Replace("%", string.Empty)
+			.Replace(" ", string.Empty)
+			.Replace("\u00A0", string.Empty)
+			.Trim();
+
+		if (value == "-" || value == "–")
+		{
+			return null;
+		}
+
+		if (double.TryParse(value, NumberStyles.Any, CultureInfo.GetCultureInfo("fr-FR"), out var number)
+			|| double.TryParse(value, NumberStyles.Any, CultureInfo.InvariantCulture, out number))
+		{
+			return number;
+		}
+
+		return null;
+	}
+}

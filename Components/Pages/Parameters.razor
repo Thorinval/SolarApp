@@ -1,0 +1,163 @@
+@page "/parametres"
+@using AtmoceSolarApp.Services
+@inject ExcelDailyReportService ExcelDailyReportService
+
+<PageTitle>Paramètres</PageTitle>
+
+<div class="container-fluid py-4">
+	<h1 class="mb-4">Paramètres</h1>
+
+	@if (isLoading)
+	{
+		<div class="alert alert-info">Chargement...</div>
+	}
+	else
+	{
+		<section class="params-section">
+			<h3 class="mb-3">Tarifs Abonnement</h3>
+			<div class="table-responsive params-table-wrap">
+				<table class="table table-striped table-sm align-middle params-table">
+					<thead>
+						<tr>
+							<th>Date début</th>
+							<th>Date fin</th>
+							<th>Tarif (€)</th>
+						</tr>
+					</thead>
+					<tbody>
+						@foreach (var row in subscriptionRows)
+						{
+							<tr>
+								<td>@row.DateDebut</td>
+								<td>@row.DateFin</td>
+								<td class="text-end">@row.Tarif</td>
+							</tr>
+						}
+					</tbody>
+				</table>
+			</div>
+		</section>
+
+		<section class="params-section">
+			<h3 class="mb-3">Cout kwh</h3>
+			<div class="table-responsive params-table-wrap">
+				<table class="table table-striped table-sm align-middle params-table">
+					<thead>
+						<tr>
+							<th>Date début</th>
+							<th>Date fin</th>
+							<th>Tarif HC(€)</th>
+							<th>Tarif HP (€)</th>
+						</tr>
+					</thead>
+					<tbody>
+						@foreach (var row in kwhRows)
+						{
+							<tr>
+								<td>@row.DateDebut</td>
+								<td>@row.DateFin</td>
+								<td class="text-end">@row.TarifHc</td>
+								<td class="text-end">@row.TarifHp</td>
+							</tr>
+						}
+					</tbody>
+				</table>
+			</div>
+		</section>
+	}
+</div>
+
+@code {
+	private bool isLoading = true;
+	private readonly List<SubscriptionTariffRow> subscriptionRows = new();
+	private readonly List<KwhTariffRow> kwhRows = new();
+
+	protected override async Task OnInitializedAsync()
+	{
+		var sheetCandidates = new[] { "parametres", "Parametres", "Paramètres" };
+
+		(List<string> Headers, List<List<string>> Rows) result = (new(), new());
+		foreach (var candidate in sheetCandidates)
+		{
+			result = await ExcelDailyReportService.ReadSheetContentSilentAsync(candidate, 9);
+			if (result.Rows.Count > 0 || result.Headers.Count > 0)
+			{
+				break;
+			}
+		}
+
+		var mode = string.Empty;
+		foreach (var row in result.Rows)
+		{
+			var c1 = Cell(row, 0);
+			var c2 = Cell(row, 1);
+			var c3 = Cell(row, 2);
+
+			if (c1.Contains("abonnement", StringComparison.OrdinalIgnoreCase))
+			{
+				mode = "abonnement";
+				continue;
+			}
+
+			if (IsHeaderRow(c1, c2, c3))
+			{
+				mode = "abonnement";
+				continue;
+			}
+
+			if (string.IsNullOrWhiteSpace(c1) && string.IsNullOrWhiteSpace(c2))
+			{
+				continue;
+			}
+
+			if (mode == "abonnement"
+				&& !c1.Contains("jour de facturation", StringComparison.OrdinalIgnoreCase)
+				&& !c1.Contains("date", StringComparison.OrdinalIgnoreCase)
+				&& !string.IsNullOrWhiteSpace(c3))
+			{
+				subscriptionRows.Add(new SubscriptionTariffRow(c1, c2, c3));
+			}
+		}
+
+		// Coût kWh: lecture des colonnes F à I (ligne utile)
+		foreach (var row in result.Rows)
+		{
+			var dateDebut = Cell(row, 5); // F
+			var dateFin = Cell(row, 6);   // G
+			var tarifHc = Cell(row, 7);   // H
+			var tarifHp = Cell(row, 8);   // I
+
+			var isHeader = dateDebut.Contains("date", StringComparison.OrdinalIgnoreCase)
+				|| dateFin.Contains("date", StringComparison.OrdinalIgnoreCase)
+				|| tarifHc.Contains("tarif", StringComparison.OrdinalIgnoreCase)
+				|| tarifHp.Contains("tarif", StringComparison.OrdinalIgnoreCase);
+
+			if (isHeader)
+			{
+				continue;
+			}
+
+			if (!string.IsNullOrWhiteSpace(dateDebut)
+				|| !string.IsNullOrWhiteSpace(dateFin)
+				|| !string.IsNullOrWhiteSpace(tarifHc)
+				|| !string.IsNullOrWhiteSpace(tarifHp))
+			{
+				kwhRows.Add(new KwhTariffRow(dateDebut, dateFin, tarifHc, tarifHp));
+				break;
+			}
+		}
+
+		isLoading = false;
+	}
+
+	private static bool IsHeaderRow(string c1, string c2, string c3)
+		=> c1.Contains("Date", StringComparison.OrdinalIgnoreCase)
+		   && c2.Contains("Date", StringComparison.OrdinalIgnoreCase)
+		   && c3.Contains("Tarif", StringComparison.OrdinalIgnoreCase);
+
+	private static string Cell(IReadOnlyList<string> row, int index)
+		=> index < row.Count ? row[index].Trim() : string.Empty;
+
+	private sealed record SubscriptionTariffRow(string DateDebut, string DateFin, string Tarif);
+	private sealed record KwhTariffRow(string DateDebut, string DateFin, string TarifHc, string TarifHp);
+}

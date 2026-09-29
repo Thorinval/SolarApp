@@ -1,0 +1,104 @@
+@page "/sync"
+@using AtmoceSolarApp.Services
+@inject SolarDataService SolarDataService
+@inject NavigationManager Navigation
+@inject ILogger<Sync> Logger
+
+<PageTitle>Synchronisation Atmoce</PageTitle>
+
+<div class="container py-4">
+	<h1 class="mb-4">
+		<i class="bi bi-cloud-arrow-down"></i> Synchronisation Atmoce
+	</h1>
+
+	@if (syncInProgress)
+	{
+		<div class="alert alert-info">
+			<div class="spinner-border spinner-border-sm me-2" role="status">
+				<span class="visually-hidden">Synchronisation...</span>
+			</div>
+			Synchronisation en cours... @statusMessage
+		</div>
+	}
+	else if (errorMessage != null)
+	{
+		<div class="alert alert-danger">
+			<strong>Erreur :</strong> @errorMessage
+		</div>
+	}
+	else if (syncCompleted)
+	{
+		<div class="alert alert-success">
+			<strong>Synchronisation complète !</strong>
+			<p>@statusMessage</p>
+			<a href="/" class="btn btn-primary">Retour au tableau de bord</a>
+		</div>
+	}
+	else
+	{
+		<div class="card">
+			<div class="card-body">
+				<h5 class="card-title">Synchroniser les données avec Atmoce</h5>
+				<p class="card-text">Cette opération va synchroniser :</p>
+				<ul>
+					<li>Les sites</li>
+					<li>Les appareils (microinverteurs, batteries, passerelles)</li>
+					<li>Les données en temps réel</li>
+					<li>Les alertes actives</li>
+				</ul>
+				<button class="btn btn-primary btn-lg" @onclick="StartSync">
+					<i class="bi bi-play-fill"></i> Démarrer la synchronisation
+				</button>
+				<a href="/" class="btn btn-secondary btn-lg">Annuler</a>
+			</div>
+		</div>
+	}
+</div>
+
+@code {
+	private bool syncInProgress = false;
+	private bool syncCompleted = false;
+	private string statusMessage = string.Empty;
+	private string? errorMessage;
+
+	private async Task StartSync()
+	{
+		try
+		{
+			syncInProgress = true;
+			statusMessage = "Synchronisation des sites...";
+			StateHasChanged();
+
+			// Sync sites
+			var sites = await SolarDataService.SyncSitesAsync();
+			statusMessage = $"✓ {sites.Count} site(s) synchronisés. Synchronisation des appareils...";
+			StateHasChanged();
+
+			// Sync devices and data for each site
+			foreach (var site in sites)
+			{
+				statusMessage = $"Synchronisation des données du site : {site.Name}...";
+				StateHasChanged();
+
+				await SolarDataService.SyncDevicesAsync(site.SiteId!);
+				await SolarDataService.SyncSiteDataAsync(site.SiteId!);
+				await SolarDataService.SyncAlertsAsync(site.SiteId!);
+
+				await Task.Delay(1000); // Rate limiting
+			}
+
+			statusMessage = "Import des relevés quotidiens Excel...";
+			StateHasChanged();
+			var importedExcelRows = await SolarDataService.ImportDailyRecordsFromExcelAsync();
+
+			syncCompleted = true;
+			statusMessage = $"Synchronisation réussie ! {sites.Count} site(s) mis à jour + {importedExcelRows} date(s) importée(s) depuis Excel.";
+		}
+		catch (Exception ex)
+		{
+			Logger.LogError(ex, "Erreur lors de la synchronisation");
+			errorMessage = $"Une erreur est survenue : {ex.Message}";
+			syncInProgress = false;
+		}
+	}
+}

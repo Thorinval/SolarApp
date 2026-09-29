@@ -1,0 +1,25 @@
+.params-section {
+    margin-bottom: 2rem;
+}
+
+.params-section h3 {
+    color: #0b3b66;
+    font-size: 1.2rem;
+}
+
+.params-table-wrap {
+    width: 50%;
+    min-width: 0;
+}
+
+@media (max-width: 1200px) {
+    .params-table-wrap {
+        width: 100%;
+    }
+}
+
+.params-table thead th {
+    background-color: #0b3b66;
+    color: #fff;
+    border-color: #295a85;
+}

@@ -1,0 +1,145 @@
+.bilan-accordion {
+    border: 1px solid #dee2e6;
+    border-radius: 0.375rem;
+    margin-bottom: 2rem;
+}
+
+.bilan-accordion-item {
+    border-bottom: 1px solid #dee2e6;
+}
+
+.bilan-accordion-item:last-child {
+    border-bottom: none;
+}
+
+.bilan-accordion .accordion-header {
+    margin-bottom: 0;
+}
+
+.bilan-accordion .accordion-button {
+    padding: 1rem 1.5rem;
+    background-color: #0b3b66;
+    color: #fff;
+    font-size: 1.1rem;
+    font-weight: 600;
+    border: none;
+    border-radius: 0;
+    box-shadow: none;
+    text-align: left;
+}
+
+.bilan-accordion .accordion-button:not(.collapsed) {
+    background-color: #0a2d4d;
+    color: #fff;
+    box-shadow: none;
+}
+
+.bilan-accordion .accordion-button:hover {
+    background-color: #0a2d4d;
+    color: #fff;
+}
+
+.bilan-accordion .accordion-button:focus {
+    outline: none;
+    box-shadow: none;
+    background-color: #0a2d4d;
+    color: #fff;
+}
+
+.bilan-accordion .accordion-button::after {
+    background-image: url("data:image/svg+xml,%3csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 16 16' fill='%23fff'%3e%3cpath fill-rule='evenodd' d='M1.646 4.646a.5.5 0 0 1 .708 0L8 10.293l5.646-5.647a.5.5 0 0 1 .708.708l-6 6a.5.5 0 0 1-.708 0l-6-6a.5.5 0 0 1 0-.708z'/%3e%3c/svg%3e");
+}
+
+.bilan-accordion .accordion-body {
+    padding: 0;
+    border-top: 1px solid #dee2e6;
+}
+
+.bilan-energy-section {
+    margin-bottom: 2rem;
+}
+
+.bilan-energie-table {
+    width: 100%;
+    table-layout: auto;
+    border-collapse: collapse;
+}
+
+.bilan-energie-table thead tr {
+    background-color: #0b3b66;
+}
+
+.bilan-energie-table thead th {
+    background-color: #0b3b66;
+    color: #fff;
+    border-color: #295a85;
+    padding: 0.75rem;
+    text-align: right;
+    font-weight: 600;
+}
+
+.bilan-energie-table thead th:first-child {
+    text-align: left;
+}
+
+.bilan-energie-table tbody td {
+    padding: 0.5rem 0.75rem;
+    border: 1px solid #dee2e6;
+}
+
+.bilan-energie-table tbody td:first-child {
+    text-align: left;
+    width: 150px;
+}
+
+.bilan-energie-table tbody td:not(:first-child) {
+    text-align: right;
+}
+
+.bilan-energie-table tbody tr.total-row {
+    background-color: #eef5ff;
+    border-top: 2px solid #5d7894;
+    font-weight: 700;
+}
+
+.bilan-energie-table tbody tr.total-row td {
+    font-weight: 700;
+}
+
+.percent-col {
+    font-weight: 500;
+}
+
+.percent-high-3 {
+    background-color: #d4edda;
+    color: #155724;
+}
+
+.percent-high-2 {
+    background-color: #e8f5e9;
+    color: #2e7d32;
+}
+
+.percent-high-1 {
+    background-color: #fff9c4;
+    color: #f57f17;
+}
+
+.percent-equal {
+    background-color: #e0e0e0;
+}
+
+.percent-low-1 {
+    background-color: #ffe0b2;
+    color: #e65100;
+}
+
+.percent-low-2 {
+    background-color: #ffcdd2;
+    color: #c62828;
+}
+
+.percent-low-3 {
+    background-color: #ffcdd2;
+    color: #b71c1c;
+}

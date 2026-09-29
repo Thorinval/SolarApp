@@ -1,0 +1,358 @@
+@page "/releve-mensuel-atmoce"
+@using System.Globalization
+@using AtmoceSolarApp.Data
+@using Microsoft.EntityFrameworkCore
+@inject AtmocDbContext DbContext
+@rendermode InteractiveServer
+
+<PageTitle>Relevé mensuel Atmoce</PageTitle>
+
+<div class="container-fluid py-4">
+	<h1 class="mb-4">Relevé mensuel Atmoce</h1>
+
+	@if (isLoading)
+	{
+		<div class="alert alert-info">Chargement...</div>
+	}
+	else if (yearBlocks.Count == 0)
+	{
+		<div class="alert alert-warning">Aucun relevé mensuel disponible.</div>
+	}
+	else
+	{
+		<div class="accordion daily-accordion" id="monthlyAccordion">
+			@foreach (var block in yearBlocks)
+			{
+				var isExpanded = expandedYears.Contains(block.Year);
+				<div class="accordion-item daily-accordion-item">
+					<h2 class="accordion-header">
+						<button
+							class="accordion-button @(!isExpanded ? "collapsed" : "")"
+							type="button"
+							@onclick="@(() => ToggleYear(block.Year))">
+							@block.Year
+						</button>
+					</h2>
+					<div
+						id="collapse-@block.Year"
+						class="accordion-collapse collapse @(isExpanded ? "show" : "")"
+						data-bs-parent="#monthlyAccordion">
+						<div class="accordion-body p-0">
+							<div class="table-responsive daily-atmoce-wrap">
+								<table class="table table-striped table-sm daily-atmoce-table">
+									<thead>
+										<tr>
+											<th class="sortable">
+												<button class="sort-button" type="button" @onclick="() => ToggleSortColumn(MonthlySortColumn.Month)">
+													@headers[0] <span class="sort-indicator">@GetSortIndicator(MonthlySortColumn.Month)</span>
+												</button>
+											</th>
+											<th class="sortable">
+												<button class="sort-button" type="button" @onclick="() => ToggleSortColumn(MonthlySortColumn.ProducedKwh)">
+													@headers[1] <span class="sort-indicator">@GetSortIndicator(MonthlySortColumn.ProducedKwh)</span>
+												</button>
+											</th>
+											<th class="sortable">
+												<button class="sort-button" type="button" @onclick="() => ToggleSortColumn(MonthlySortColumn.ConsumedKwh)">
+													@headers[2] <span class="sort-indicator">@GetSortIndicator(MonthlySortColumn.ConsumedKwh)</span>
+												</button>
+											</th>
+											<th class="sortable">
+												<button class="sort-button" type="button" @onclick="() => ToggleSortColumn(MonthlySortColumn.FromGridKwh)">
+													@headers[3] <span class="sort-indicator">@GetSortIndicator(MonthlySortColumn.FromGridKwh)</span>
+												</button>
+											</th>
+											<th class="sortable">
+												<button class="sort-button" type="button" @onclick="() => ToggleSortColumn(MonthlySortColumn.ToGridKwh)">
+													@headers[4] <span class="sort-indicator">@GetSortIndicator(MonthlySortColumn.ToGridKwh)</span>
+												</button>
+											</th>
+											<th class="sortable">
+												<button class="sort-button" type="button" @onclick="() => ToggleSortColumn(MonthlySortColumn.ChargedKwh)">
+													@headers[5] <span class="sort-indicator">@GetSortIndicator(MonthlySortColumn.ChargedKwh)</span>
+												</button>
+											</th>
+											<th class="sortable">
+												<button class="sort-button" type="button" @onclick="() => ToggleSortColumn(MonthlySortColumn.DischargedKwh)">
+													@headers[6] <span class="sort-indicator">@GetSortIndicator(MonthlySortColumn.DischargedKwh)</span>
+												</button>
+											</th>
+											<th class="sortable">
+												<button class="sort-button" type="button" @onclick="() => ToggleSortColumn(MonthlySortColumn.Autonomy)">
+													@headers[7] <span class="sort-indicator">@GetSortIndicator(MonthlySortColumn.Autonomy)</span>
+												</button>
+											</th>
+											<th class="sortable">
+												<button class="sort-button" type="button" @onclick="() => ToggleSortColumn(MonthlySortColumn.DaysWithoutSocMax)">
+													@headers[8] <span class="sort-indicator">@GetSortIndicator(MonthlySortColumn.DaysWithoutSocMax)</span>
+												</button>
+											</th>
+											<th class="sortable">
+												<button class="sort-button" type="button" @onclick="() => ToggleSortColumn(MonthlySortColumn.DaysWithSocMin)">
+													@headers[9] <span class="sort-indicator">@GetSortIndicator(MonthlySortColumn.DaysWithSocMin)</span>
+												</button>
+											</th>
+										</tr>
+									</thead>
+									<tbody>
+										@foreach (var row in block.Rows)
+										{
+											<tr>
+												<td>@row.Month</td>
+												<td>@row.ProducedKwh.ToString("F2", frCulture)</td>
+												<td>@row.ConsumedKwh.ToString("F2", frCulture)</td>
+												<td>@row.FromGridKwh.ToString("F2", frCulture)</td>
+												<td>@row.ToGridKwh.ToString("F2", frCulture)</td>
+												<td>@row.ChargedKwh.ToString("F2", frCulture)</td>
+												<td>@row.DischargedKwh.ToString("F2", frCulture)</td>
+												<td>@row.Autonomy.ToString("F2", frCulture)</td>
+												<td>@row.DaysWithoutSocMax.ToString(frCulture)</td>
+												<td>@row.DaysWithSocMin.ToString(frCulture)</td>
+											</tr>
+										}
+									</tbody>
+								</table>
+							</div>
+						</div>
+					</div>
+				</div>
+			}
+		</div>
+	}
+</div>
+
+@code {
+	private readonly CultureInfo frCulture = CultureInfo.GetCultureInfo("fr-FR");
+	private List<string> headers = [];
+	private List<YearBlock> yearBlocks = [];
+	private HashSet<string> expandedYears = [];
+	private bool isLoading = true;
+	private MonthlySortColumn currentSortColumn = MonthlySortColumn.Month;
+	private bool isAscending = false;
+
+	protected override async Task OnInitializedAsync()
+	{
+		headers =
+		[
+			"Mois",
+			"Produit (kWh)",
+			"Consommé (kWh)",
+			"Depuis réseau (kWh)",
+			"Vers réseau (kWh)",
+			"Chargé (kWh)",
+			"Déchargé (kWh)",
+			"Autonomie (%)",
+			"J sans SOC max",
+			"J avec SOC min"
+		];
+
+		await LoadMonthlyRowsAsync();
+	}
+
+	private async Task LoadMonthlyRowsAsync()
+	{
+		isLoading = true;
+
+		try
+		{
+			var records = await DbContext.DailyEnergyRecords
+				.AsNoTracking()
+				.ToListAsync();
+
+			var groupedMonths = records
+				.GroupBy(r => new DateOnly(r.RecordDate.Year, r.RecordDate.Month, 1))
+				.Select(g => BuildMonthlyRow(g.Key, g))
+				.ToList();
+
+			BuildYearBlocks(groupedMonths);
+
+			expandedYears.Clear();
+			var currentYear = DateTime.Now.Year.ToString(frCulture);
+			if (yearBlocks.Any(b => b.Year == currentYear))
+			{
+				expandedYears.Add(currentYear);
+			}
+			else if (yearBlocks.Count > 0)
+			{
+				expandedYears.Add(yearBlocks[0].Year);
+			}
+		}
+		finally
+		{
+			isLoading = false;
+		}
+	}
+
+	private void BuildYearBlocks(IEnumerable<MonthlyRowVm> rows)
+	{
+		yearBlocks = rows
+			.GroupBy(row => row.Year)
+			.OrderByDescending(g => g.Key)
+			.Select(g => new YearBlock
+			{
+				Year = g.Key.ToString(frCulture),
+				Rows = SortRows(g).ToList()
+			})
+			.ToList();
+	}
+
+	private IEnumerable<MonthlyRowVm> SortRows(IEnumerable<MonthlyRowVm> rows)
+	{
+		return currentSortColumn switch
+		{
+			MonthlySortColumn.Month => isAscending
+				? rows.OrderBy(r => r.MonthOrder)
+				: rows.OrderByDescending(r => r.MonthOrder),
+			MonthlySortColumn.ProducedKwh => isAscending
+				? rows.OrderBy(r => r.ProducedKwh).ThenBy(r => r.MonthOrder)
+				: rows.OrderByDescending(r => r.ProducedKwh).ThenByDescending(r => r.MonthOrder),
+			MonthlySortColumn.ConsumedKwh => isAscending
+				? rows.OrderBy(r => r.ConsumedKwh).ThenBy(r => r.MonthOrder)
+				: rows.OrderByDescending(r => r.ConsumedKwh).ThenByDescending(r => r.MonthOrder),
+			MonthlySortColumn.FromGridKwh => isAscending
+				? rows.OrderBy(r => r.FromGridKwh).ThenBy(r => r.MonthOrder)
+				: rows.OrderByDescending(r => r.FromGridKwh).ThenByDescending(r => r.MonthOrder),
+			MonthlySortColumn.ToGridKwh => isAscending
+				? rows.OrderBy(r => r.ToGridKwh).ThenBy(r => r.MonthOrder)
+				: rows.OrderByDescending(r => r.ToGridKwh).ThenByDescending(r => r.MonthOrder),
+			MonthlySortColumn.ChargedKwh => isAscending
+				? rows.OrderBy(r => r.ChargedKwh).ThenBy(r => r.MonthOrder)
+				: rows.OrderByDescending(r => r.ChargedKwh).ThenByDescending(r => r.MonthOrder),
+			MonthlySortColumn.DischargedKwh => isAscending
+				? rows.OrderBy(r => r.DischargedKwh).ThenBy(r => r.MonthOrder)
+				: rows.OrderByDescending(r => r.DischargedKwh).ThenByDescending(r => r.MonthOrder),
+			MonthlySortColumn.Autonomy => isAscending
+				? rows.OrderBy(r => r.Autonomy).ThenBy(r => r.MonthOrder)
+				: rows.OrderByDescending(r => r.Autonomy).ThenByDescending(r => r.MonthOrder),
+			MonthlySortColumn.DaysWithoutSocMax => isAscending
+				? rows.OrderBy(r => r.DaysWithoutSocMax).ThenBy(r => r.MonthOrder)
+				: rows.OrderByDescending(r => r.DaysWithoutSocMax).ThenByDescending(r => r.MonthOrder),
+			MonthlySortColumn.DaysWithSocMin => isAscending
+				? rows.OrderBy(r => r.DaysWithSocMin).ThenBy(r => r.MonthOrder)
+				: rows.OrderByDescending(r => r.DaysWithSocMin).ThenByDescending(r => r.MonthOrder),
+			_ => rows
+		};
+	}
+
+	private MonthlyRowVm BuildMonthlyRow(DateOnly monthDate, IEnumerable<AtmoceSolarApp.Models.DailyEnergyRecord> monthRecords)
+	{
+		var producedKwh = monthRecords.Sum(x => x.ProducedKwh);
+		var consumedKwh = monthRecords.Sum(x => x.ConsumedKwh);
+		var fromGridKwh = monthRecords.Sum(x => x.FromGridKwh);
+		var toGridKwh = monthRecords.Sum(x => x.ToGridKwh);
+		var chargedKwh = monthRecords.Sum(x => x.ChargedKwh);
+		var dischargedKwh = monthRecords.Sum(x => x.DischargedKwh);
+
+		var autonomy = consumedKwh == 0
+			? 0
+			: (1 - (fromGridKwh / consumedKwh)) * 100;
+
+		var daysWithoutSocMax = monthRecords.Count(x => x.SocMax < 100);
+		var daysWithSocMin = monthRecords.Count(x => x.ColumnIValue <= 10);
+
+		return new MonthlyRowVm
+		{
+			Year = monthDate.Year,
+			MonthOrder = monthDate.Month,
+			Month = CapitalizeFirstLetter(monthDate.ToDateTime(TimeOnly.MinValue).ToString("MMMM", frCulture)),
+			ProducedKwh = producedKwh,
+			ConsumedKwh = consumedKwh,
+			FromGridKwh = fromGridKwh,
+			ToGridKwh = toGridKwh,
+			ChargedKwh = chargedKwh,
+			DischargedKwh = dischargedKwh,
+			Autonomy = autonomy,
+			DaysWithoutSocMax = daysWithoutSocMax,
+			DaysWithSocMin = daysWithSocMin
+		};
+	}
+
+	private void ToggleSortColumn(MonthlySortColumn column)
+	{
+		if (currentSortColumn == column)
+		{
+			isAscending = !isAscending;
+		}
+		else
+		{
+			currentSortColumn = column;
+			isAscending = true;
+		}
+
+		BuildYearBlocks(GetAllRows());
+		StateHasChanged();
+	}
+
+	private IEnumerable<MonthlyRowVm> GetAllRows()
+	{
+		return yearBlocks.SelectMany(block => block.Rows);
+	}
+
+	private void ToggleYear(string year)
+	{
+		if (expandedYears.Contains(year))
+		{
+			expandedYears.Remove(year);
+		}
+		else
+		{
+			expandedYears.Add(year);
+		}
+	}
+
+	private string GetSortIndicator(MonthlySortColumn column)
+	{
+		if (currentSortColumn != column)
+		{
+			return "↕";
+		}
+
+		return isAscending ? "▲" : "▼";
+	}
+
+	private string CapitalizeFirstLetter(string value)
+	{
+		if (string.IsNullOrWhiteSpace(value))
+		{
+			return value;
+		}
+
+		return char.ToUpper(value[0], frCulture) + value[1..];
+	}
+
+	private sealed class YearBlock
+	{
+		public required string Year { get; init; }
+		public required List<MonthlyRowVm> Rows { get; init; }
+	}
+
+	private sealed class MonthlyRowVm
+	{
+		public int Year { get; init; }
+		public int MonthOrder { get; init; }
+		public required string Month { get; init; }
+		public double ProducedKwh { get; init; }
+		public double ConsumedKwh { get; init; }
+		public double FromGridKwh { get; init; }
+		public double ToGridKwh { get; init; }
+		public double ChargedKwh { get; init; }
+		public double DischargedKwh { get; init; }
+		public double Autonomy { get; init; }
+		public int DaysWithoutSocMax { get; init; }
+		public int DaysWithSocMin { get; init; }
+	}
+
+	private enum MonthlySortColumn
+	{
+		Month,
+		ProducedKwh,
+		ConsumedKwh,
+		FromGridKwh,
+		ToGridKwh,
+		ChargedKwh,
+		DischargedKwh,
+		Autonomy,
+		DaysWithoutSocMax,
+		DaysWithSocMin
+	}
+}
