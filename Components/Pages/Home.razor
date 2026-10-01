@@ -1,9 +1,12 @@
 ﻿@page "/"
+@using System.IO
 @using SolarApp.Models
 @using SolarApp.Services
 @using Microsoft.EntityFrameworkCore
 @inject SolarDataService SolarDataService
+@inject ExcelDailyReportService ExcelDailyReportService
 @inject ILogger<Home> Logger
+@rendermode InteractiveServer
 
 <PageTitle>Tableau de Bord - Suivi Solaire</PageTitle>
 
@@ -96,6 +99,78 @@
                 </div>
             </a>
         </div>
+    </div>
+
+    <div class="daily-import-panel mb-5">
+        <h2 class="mb-3">Import des données journalières Atmoce</h2>
+        <p class="text-muted mb-3">
+            Connexion à Atmoce Cloud puis lecture directe de la page de relevé quotidien.
+            Les données récupérées s’affichent dans cette page web sans modifier le fichier Excel d’origine.
+        </p>
+        <button class="btn btn-outline-primary" @onclick="ImportFromAtmoceCloud" disabled="@isImporting">
+            @if (isImporting)
+            {
+                <span class="spinner-border spinner-border-sm me-2" role="status" aria-hidden="true"></span>
+            }
+            <i class="bi bi-cloud-arrow-down"></i> Importer depuis Atmoce Cloud
+        </button>
+
+        @if (isImporting || !string.IsNullOrWhiteSpace(importStatusMessage))
+        {
+            <div class="progress mt-3 import-progress" role="progressbar" aria-label="Progression import" aria-valuemin="0" aria-valuemax="100" aria-valuenow="100">
+                <div class="progress-bar progress-bar-striped progress-bar-animated" style="width: 100%">@((importStatusMessage ?? "Mise à jour en cours...") )</div>
+            </div>
+        }
+
+        @if (showUpdateOkHint)
+        {
+            <div class="import-ok-hint mt-2">Maj ok</div>
+        }
+
+        @if (!string.IsNullOrWhiteSpace(importMessage))
+        {
+            <div class="alert @(isImportSuccess ? "alert-success" : "alert-danger") mt-3 mb-0" role="alert">
+                @importMessage
+            </div>
+        }
+
+        @if (!string.IsNullOrWhiteSpace(importDataPreview))
+        {
+            <details class="import-preview mt-3" open>
+                <summary>Aperçu des données récupérées depuis Atmoce Cloud</summary>
+
+                @if (importPreviewRows.Count > 0)
+                {
+                    <div class="table-responsive import-preview-table-wrap mt-3">
+                        <table class="table table-sm table-striped align-middle import-preview-table">
+                            <thead>
+                                <tr>
+                                    @foreach (var header in importPreviewHeaders)
+                                    {
+                                        <th>@header</th>
+                                    }
+                                </tr>
+                            </thead>
+                            <tbody>
+                                @foreach (var row in importPreviewRows)
+                                {
+                                    <tr>
+                                        @for (var i = 0; i < row.Count; i++)
+                                        {
+                                            <td>@row[i]</td>
+                                        }
+                                    </tr>
+                                }
+                            </tbody>
+                        </table>
+                    </div>
+                }
+                else
+                {
+                    <pre class="mt-3">@importDataPreview</pre>
+                }
+            </details>
+        }
     </div>
 
     <hr class="my-5" />
@@ -211,6 +286,14 @@
     private List<Site> sites = new();
     private Dictionary<int, List<SiteDataSnapshot>> lastSnapshots = new();
     private bool isLoading = true;
+    private bool isImporting;
+    private bool isImportSuccess;
+    private bool showUpdateOkHint;
+    private string? importStatusMessage;
+    private string? importMessage;
+    private string? importDataPreview;
+    private List<string> importPreviewHeaders = new();
+    private List<List<string>> importPreviewRows = new();
     private string? errorMessage;
 
     protected override async Task OnInitializedAsync()
@@ -241,6 +324,82 @@
     {
         isLoading = true;
         await OnInitializedAsync();
+    }
+
+    private async Task ImportFromAtmoceCloud()
+    {
+        try
+        {
+            isImporting = true;
+            showUpdateOkHint = false;
+            importMessage = null;
+            importDataPreview = null;
+            importPreviewHeaders = new List<string>();
+            importPreviewRows = new List<List<string>>();
+            importStatusMessage = "Démarrage de l’import...";
+
+            var progress = new Progress<string>(message =>
+            {
+                importStatusMessage = message;
+                _ = InvokeAsync(StateHasChanged);
+            });
+
+            await InvokeAsync(StateHasChanged);
+            await Task.Yield();
+
+            var result = await ExcelDailyReportService.ImportFromAtmoceCloudAsync(progress);
+            isImportSuccess = result.Success;
+            showUpdateOkHint = result.Success;
+            importMessage = result.Message;
+            importDataPreview = result.DataPreview;
+            (importPreviewHeaders, importPreviewRows) = ParseImportPreview(result.DataPreview);
+            importStatusMessage = result.Success ? "Import terminé." : result.Message;
+        }
+        catch (Exception ex)
+        {
+            isImportSuccess = false;
+            showUpdateOkHint = false;
+            importMessage = "Erreur lors de l'import depuis Atmoce Cloud.";
+            importStatusMessage = "Erreur lors de l'import.";
+            Logger.LogError(ex, "Erreur lors de l'import Atmoce Cloud");
+        }
+        finally
+        {
+            isImporting = false;
+        }
+    }
+
+    private static (List<string> Headers, List<List<string>> Rows) ParseImportPreview(string? preview)
+    {
+        if (string.IsNullOrWhiteSpace(preview))
+        {
+            return (new List<string>(), new List<List<string>>());
+        }
+
+        var lines = preview
+            .Split(new[] { Environment.NewLine }, StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries)
+            .ToList();
+
+        if (lines.Count == 0)
+        {
+            return (new List<string>(), new List<List<string>>());
+        }
+
+        var headers = lines[0]
+            .Split('|', StringSplitOptions.TrimEntries | StringSplitOptions.RemoveEmptyEntries)
+            .Select(x => x.Trim())
+            .ToList();
+
+        var rows = new List<List<string>>();
+        foreach (var line in lines.Skip(1))
+        {
+            rows.Add(line
+                .Split('|', StringSplitOptions.TrimEntries | StringSplitOptions.RemoveEmptyEntries)
+                .Select(x => x.Trim())
+                .ToList());
+        }
+
+        return (headers, rows);
     }
 }
 

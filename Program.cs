@@ -1,5 +1,6 @@
 ﻿using SolarApp.Components;
 using SolarApp.Data;
+using SolarApp.Logging;
 using SolarApp.Services;
 using Microsoft.EntityFrameworkCore;
 
@@ -19,11 +20,13 @@ builder.Services.AddHttpClient();
 
 // Add custom services
 builder.Services.AddScoped<AtmocApiService>();
+builder.Services.AddScoped<AtmoceCloudBrowserService>();
 builder.Services.AddScoped<ExcelDailyReportService>();
 builder.Services.AddScoped<SolarDataService>();
 
 // Add Logging
 builder.Services.AddLogging();
+builder.Logging.AddProvider(new FileLoggerProvider(Path.Combine(builder.Environment.ContentRootPath, "Logs")));
 
 var app = builder.Build();
 

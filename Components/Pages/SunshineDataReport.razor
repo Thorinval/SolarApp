@@ -129,10 +129,12 @@
 		headers = result.Headers;
 		rows = filteredRows;
 
-		// Expand first block by default
+		// Expand current year block by default (fallback to first block)
 		if (blocks.Count > 0)
 		{
-			expandedBlocks.Add(blocks[0].Title);
+			var currentYearTitle = DateTime.Now.Year.ToString(CultureInfo.InvariantCulture);
+			var defaultBlock = blocks.FirstOrDefault(b => b.Title == currentYearTitle)?.Title ?? blocks[0].Title;
+			expandedBlocks.Add(defaultBlock);
 		}
 
 		isLoading = false;

@@ -1,0 +1,11 @@
+User chose: Navigate to /table before searching.
+Suggested change: Before running the selector loop in WaitForDataTableAsync, ensure page is on the expected table URL (tableUrl) or navigate to it when the current URL does not match.
+Example code to insert in WaitForDataTableAsync (C#):
+
+await page.GotoAsync(tableUrl, new PageGotoOptions
+{
+	WaitUntil = WaitUntilState.DOMContentLoaded,
+	Timeout = 120_000
+});
+
+Note: Need to pass tableUrl into WaitForDataTableAsync or retrieve it from caller.
