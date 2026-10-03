@@ -1,6 +1,9 @@
 ﻿@page "/bilan-energie"
-@using SolarApp.Services
-@inject ExcelDailyReportService ExcelDailyReportService
+@using System.Globalization
+@using SolarApp.Data
+@using SolarApp.Models
+@using Microsoft.EntityFrameworkCore
+@inject AtmocDbContext DbContext
 @rendermode InteractiveServer
 
 <PageTitle>Bilan énergie solaire</PageTitle>
@@ -80,6 +83,7 @@
 </div>
 
 @code {
+	private readonly CultureInfo frCulture = CultureInfo.GetCultureInfo("fr-FR");
 	private List<string> headers = new();
 	private List<BlockData> blocks = new();
 	private bool isLoading = true;
@@ -87,30 +91,56 @@
 
 	protected override async Task OnInitializedAsync()
 	{
-		var result = await ExcelDailyReportService.ReadSheetContentAsync("Bilan énergie", 16);
+		headers =
+		[
+			"Année",
+			"Mois",
+			"Produit (kWh)",
+			"Consommé (kWh)",
+			"Depuis réseau (kWh)",
+			"Vers réseau (kWh)",
+			"Chargé (kWh)",
+			"Déchargé (kWh)",
+			"Autonomie (%)",
+			"J sans SOC max",
+			"J avec SOC min"
+		];
 
-		// Normalize headers: rename "Colonne1" to "Année"
-		headers = result.Headers.Select(h => 
-			h.Equals("Colonne1", StringComparison.OrdinalIgnoreCase) ? "Année" : h
-		).ToList();
+		await LoadFromMonthlySourceAsync();
+	}
 
-		var displayRows = BuildDisplayRows(result.Rows, 16);
-		blocks = BuildBlocksByYear(displayRows);
-
-		// Expand current year block by default
-		var currentYear = DateTime.Now.Year.ToString();
-		var currentYearBlock = blocks.FirstOrDefault(b => b.Title == currentYear);
-		if (currentYearBlock != null)
+	private async Task LoadFromMonthlySourceAsync()
+	{
+		isLoading = true;
+		try
 		{
-			expandedBlocks.Add(currentYear);
-		}
-		else if (blocks.Count > 0)
-		{
-			// If current year not found, expand the last year in the list
-			expandedBlocks.Add(blocks[blocks.Count - 1].Title);
-		}
+			var records = await DbContext.DailyEnergyRecords
+				.AsNoTracking()
+				.ToListAsync();
 
-		isLoading = false;
+			var monthlyRows = records
+				.GroupBy(r => new DateOnly(r.RecordDate.Year, r.RecordDate.Month, 1))
+				.Select(g => BuildMonthlyRow(g.Key, g))
+				.ToList();
+
+			blocks = BuildBlocksByYear(monthlyRows);
+
+			expandedBlocks.Clear();
+			var currentYear = DateTime.Now.Year.ToString(frCulture);
+			var currentYearBlock = blocks.FirstOrDefault(b => b.Title == currentYear);
+			if (currentYearBlock is not null)
+			{
+				expandedBlocks.Add(currentYear);
+			}
+			else if (blocks.Count > 0)
+			{
+				expandedBlocks.Add(blocks[0].Title);
+			}
+		}
+		finally
+		{
+			isLoading = false;
+		}
 	}
 
 	private void ToggleBlock(string year)
@@ -125,82 +155,119 @@
 		}
 	}
 
-	private static List<RowVm> BuildDisplayRows(List<List<string>> sourceRows, int expectedColumns)
+	private MonthlySourceRow BuildMonthlyRow(DateOnly monthDate, IEnumerable<DailyEnergyRecord> monthRecords)
 	{
-		var output = new List<RowVm>();
-		var currentYear = string.Empty;
+		var producedKwh = monthRecords.Sum(x => x.ProducedKwh);
+		var consumedKwh = monthRecords.Sum(x => x.ConsumedKwh);
+		var fromGridKwh = monthRecords.Sum(x => x.FromGridKwh);
+		var toGridKwh = monthRecords.Sum(x => x.ToGridKwh);
+		var chargedKwh = monthRecords.Sum(x => x.ChargedKwh);
+		var dischargedKwh = monthRecords.Sum(x => x.DischargedKwh);
 
-		foreach (var sourceRow in sourceRows)
+		var autonomy = consumedKwh == 0
+			? 0
+			: (1 - (fromGridKwh / consumedKwh)) * 100;
+
+		var daysWithoutSocMax = monthRecords.Count(x => x.SocMax < 100);
+		var daysWithSocMin = monthRecords.Count(x => x.ColumnIValue <= 10);
+
+		return new MonthlySourceRow
 		{
-			var cells = new List<string>(sourceRow);
-			while (cells.Count < expectedColumns)
-			{
-				cells.Add(string.Empty);
-			}
-
-			var rowYear = cells[0].Trim();
-			var month = cells[1].Trim();
-
-			if (!string.IsNullOrWhiteSpace(rowYear))
-			{
-				// Extract year even if it's prefixed with "Cumul"
-				var yearOnly = System.Text.RegularExpressions.Regex.Match(rowYear, @"\d{4}").Value;
-				if (!string.IsNullOrWhiteSpace(yearOnly))
-				{
-					currentYear = yearOnly;
-				}
-				else
-				{
-					currentYear = rowYear;
-				}
-			}
-
-			var effectiveYear = currentYear;
-			var isTotal = month.Contains("cumul", StringComparison.OrdinalIgnoreCase) || 
-						  rowYear.Contains("cumul", StringComparison.OrdinalIgnoreCase);
-
-			output.Add(new RowVm
-			{
-				Cells = cells,
-				Month = CapitalizeFirstLetter(month),
-				EffectiveYear = effectiveYear,
-				IsTotal = isTotal
-			});
-		}
-
-		return output;
+			Year = monthDate.Year,
+			MonthOrder = monthDate.Month,
+			Month = CapitalizeFirstLetter(monthDate.ToDateTime(TimeOnly.MinValue).ToString("MMMM", frCulture)),
+			ProducedKwh = producedKwh,
+			ConsumedKwh = consumedKwh,
+			FromGridKwh = fromGridKwh,
+			ToGridKwh = toGridKwh,
+			ChargedKwh = chargedKwh,
+			DischargedKwh = dischargedKwh,
+			Autonomy = autonomy,
+			DaysWithoutSocMax = daysWithoutSocMax,
+			DaysWithSocMin = daysWithSocMin
+		};
 	}
 
-	private static string CapitalizeFirstLetter(string value)
+	private List<BlockData> BuildBlocksByYear(List<MonthlySourceRow> rows)
+	{
+		return rows
+			.GroupBy(r => r.Year)
+			.OrderByDescending(g => g.Key)
+			.Select(g =>
+			{
+				var orderedRows = g.OrderByDescending(x => x.MonthOrder).ToList();
+				var blockRows = orderedRows
+					.Select(row => new RowVm
+					{
+						Cells = BuildCells(g.Key.ToString(frCulture), row),
+						Month = row.Month,
+						EffectiveYear = g.Key.ToString(frCulture),
+						IsTotal = false
+					})
+					.ToList();
+
+				var totalProduced = orderedRows.Sum(x => x.ProducedKwh);
+				var totalConsumed = orderedRows.Sum(x => x.ConsumedKwh);
+				var totalFromGrid = orderedRows.Sum(x => x.FromGridKwh);
+				var totalToGrid = orderedRows.Sum(x => x.ToGridKwh);
+				var totalCharged = orderedRows.Sum(x => x.ChargedKwh);
+				var totalDischarged = orderedRows.Sum(x => x.DischargedKwh);
+				var totalAutonomy = totalConsumed == 0 ? 0 : (1 - (totalFromGrid / totalConsumed)) * 100;
+				var totalDaysWithoutSocMax = orderedRows.Sum(x => x.DaysWithoutSocMax);
+				var totalDaysWithSocMin = orderedRows.Sum(x => x.DaysWithSocMin);
+
+				blockRows.Add(new RowVm
+				{
+					Cells =
+					[
+						g.Key.ToString(frCulture),
+						"Cumul",
+						totalProduced.ToString("F2", frCulture),
+						totalConsumed.ToString("F2", frCulture),
+						totalFromGrid.ToString("F2", frCulture),
+						totalToGrid.ToString("F2", frCulture),
+						totalCharged.ToString("F2", frCulture),
+						totalDischarged.ToString("F2", frCulture),
+						$"{totalAutonomy:F2}%",
+						totalDaysWithoutSocMax.ToString(frCulture),
+						totalDaysWithSocMin.ToString(frCulture)
+					],
+					Month = "Cumul",
+					EffectiveYear = g.Key.ToString(frCulture),
+					IsTotal = true
+				});
+
+				return new BlockData { Title = g.Key.ToString(frCulture), Rows = blockRows };
+			})
+			.ToList();
+	}
+
+	private List<string> BuildCells(string year, MonthlySourceRow row)
+	{
+		return
+		[
+			year,
+			row.Month,
+			row.ProducedKwh.ToString("F2", frCulture),
+			row.ConsumedKwh.ToString("F2", frCulture),
+			row.FromGridKwh.ToString("F2", frCulture),
+			row.ToGridKwh.ToString("F2", frCulture),
+			row.ChargedKwh.ToString("F2", frCulture),
+			row.DischargedKwh.ToString("F2", frCulture),
+			$"{row.Autonomy:F2}%",
+			row.DaysWithoutSocMax.ToString(frCulture),
+			row.DaysWithSocMin.ToString(frCulture)
+		];
+	}
+
+	private string CapitalizeFirstLetter(string value)
 	{
 		if (string.IsNullOrWhiteSpace(value))
 		{
 			return value;
 		}
 
-		return char.ToUpper(value[0]) + value[1..];
-	}
-
-	private static List<BlockData> BuildBlocksByYear(List<RowVm> rows)
-	{
-		var blocksByYear = new Dictionary<string, List<RowVm>>();
-
-		foreach (var row in rows)
-		{
-			if (!blocksByYear.ContainsKey(row.EffectiveYear))
-			{
-				blocksByYear[row.EffectiveYear] = new List<RowVm>();
-			}
-			blocksByYear[row.EffectiveYear].Add(row);
-		}
-
-		var blocks = new List<BlockData>();
-		foreach (var year in blocksByYear.Keys)
-		{
-			blocks.Add(new BlockData { Title = year, Rows = blocksByYear[year] });
-		}
-
-		return blocks;
+		return char.ToUpper(value[0], frCulture) + value[1..];
 	}
 
 	private static string GetRowClass(RowVm row)
@@ -271,6 +338,22 @@
 	{
 		public required string Title { get; init; }
 		public required List<RowVm> Rows { get; init; }
+	}
+
+	private sealed class MonthlySourceRow
+	{
+		public required int Year { get; init; }
+		public required int MonthOrder { get; init; }
+		public required string Month { get; init; }
+		public required double ProducedKwh { get; init; }
+		public required double ConsumedKwh { get; init; }
+		public required double FromGridKwh { get; init; }
+		public required double ToGridKwh { get; init; }
+		public required double ChargedKwh { get; init; }
+		public required double DischargedKwh { get; init; }
+		public required double Autonomy { get; init; }
+		public required int DaysWithoutSocMax { get; init; }
+		public required int DaysWithSocMin { get; init; }
 	}
 }
 

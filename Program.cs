@@ -23,6 +23,7 @@ builder.Services.AddScoped<AtmocApiService>();
 builder.Services.AddScoped<AtmoceCloudBrowserService>();
 builder.Services.AddScoped<ExcelDailyReportService>();
 builder.Services.AddScoped<SolarDataService>();
+builder.Services.AddSingleton<AppRuntimeSettingsService>();
 
 // Add Logging
 builder.Services.AddLogging();
@@ -40,13 +41,27 @@ using (var scope = app.Services.CreateScope())
 
     try
     {
-        var solarDataService = scope.ServiceProvider.GetRequiredService<SolarDataService>();
-        var importedCount = await solarDataService.ImportDailyRecordsFromExcelAsync();
-        logger.LogInformation("Import Excel au démarrage terminé : {Count} nouvelle(s) date(s)", importedCount);
+        var runtimeSettingsService = scope.ServiceProvider.GetRequiredService<AppRuntimeSettingsService>();
+        var startupSettings = await runtimeSettingsService.GetSettingsAsync();
+
+        if (!startupSettings.UpdateOnLaunch)
+        {
+            logger.LogInformation("Mise à jour au lancement désactivée (paramètre utilisateur).");
+        }
+        else if (startupSettings.InitializationSource == InitializationSource.Excel)
+        {
+            var solarDataService = scope.ServiceProvider.GetRequiredService<SolarDataService>();
+            var importedCount = await solarDataService.ImportDailyRecordsFromExcelAsync();
+            logger.LogInformation("Initialisation Excel au démarrage terminée : {Count} nouvelle(s) date(s)", importedCount);
+        }
+        else
+        {
+            logger.LogInformation("Initialisation au démarrage depuis la BDD (aucun import Excel exécuté).");
+        }
     }
     catch (Exception ex)
     {
-        logger.LogWarning(ex, "Import Excel au démarrage ignoré (application continue)");
+        logger.LogWarning(ex, "Initialisation au démarrage partiellement ignorée (application continue)");
     }
 }
 

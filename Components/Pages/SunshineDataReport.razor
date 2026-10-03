@@ -56,7 +56,8 @@
 												<td class="sticky-col text-start">@GetCell(row, 0)</td>
 												@foreach (var col in block.Columns)
 												{
-													var value = GetCell(row, col.ColumnIndex);
+													var rawValue = GetCell(row, col.ColumnIndex);
+													var value = FormatCellValue(rawValue, col.IsPercent);
 													var header = GetHeader(col.ColumnIndex, col.Fallback);
 													<td class="@GetCellClass(value, header, col.IsPercent)">@value</td>
 												}
@@ -78,10 +79,10 @@
 	[
 		new("Théorique initiale",
 		[
-			new(1, "Prod théorique", false),
+			new(1, "Prod théorique (kWh)", false),
 			new(2, "Prod théorique (index)", false),
-			new(3, "Conso théorique", false),
-			new(4, "Couverture solaire théorique", true)
+			new(3, "Conso théorique (kWh)", false),
+			new(4, "Couverture solaire théorique (%)", true)
 		]),
 		new("2026",
 		[
@@ -91,8 +92,8 @@
 			new(8, "Prod réelle (index)", false),
 			new(9, "Conso maison (kWh)", false),
 			new(10, "Conso réseau (kWh)", false),
-			new(11, "Couverture solaire réelle", true),
-			new(12, "Conso réseau %", true)
+			new(11, "Couverture solaire réelle (%)", true),
+			new(12, "Conso réseau (%)", true)
 		]),
 		new("2027",
 		[
@@ -102,8 +103,8 @@
 			new(17, "Prod réelle (index)", false),
 			new(18, "Conso maison (kWh)", false),
 			new(19, "Conso réseau (kWh)", false),
-			new(20, "Couverture solaire réelle", true),
-			new(21, "Conso réseau %", true)
+			new(20, "Couverture solaire réelle (%)", true),
+			new(21, "Conso réseau (%)", true)
 		])
 	];
 
@@ -128,6 +129,7 @@
 
 		headers = result.Headers;
 		rows = filteredRows;
+		FillDerivedSunshineColumns();
 
 		// Expand current year block by default (fallback to first block)
 		if (blocks.Count > 0)
@@ -154,6 +156,26 @@
 
 	private static string GetCell(IReadOnlyList<string> row, int index)
 		=> index < row.Count ? row[index] : string.Empty;
+
+	private static string FormatCellValue(string input, bool isPercentColumn)
+	{
+		if (string.IsNullOrWhiteSpace(input))
+		{
+			return string.Empty;
+		}
+
+		if (!TryParseCellNumber(input, out var numericValue))
+		{
+			return input.Trim();
+		}
+
+		var valueToRound = isPercentColumn && !input.Contains('%')
+			? numericValue * 100d
+			: numericValue;
+
+		var rounded = Math.Round(valueToRound, 0, MidpointRounding.AwayFromZero);
+		return rounded.ToString("0", CultureInfo.GetCultureInfo("fr-FR"));
+	}
 
 	private static bool IsTotalRow(IReadOnlyList<string> row)
 		=> row.Count > 0 && row[0].Contains("Total", StringComparison.OrdinalIgnoreCase);
@@ -275,6 +297,133 @@
 		if (percent >= 40) return "red-yellow-mid";
 		if (percent >= 20) return "red-yellow-low-2";
 		return "red-yellow-low-3";
+	}
+
+	private void FillDerivedSunshineColumns()
+	{
+		var theoreticalBlock = blocks.FirstOrDefault(b => b.Title.Equals("Théorique initiale", StringComparison.OrdinalIgnoreCase));
+		var theoreticalProdColumn = theoreticalBlock?.Columns.FirstOrDefault(c => c.Fallback.Contains("Prod théorique", StringComparison.OrdinalIgnoreCase));
+		var theoreticalProdIndexColumn = theoreticalBlock?.Columns.FirstOrDefault(c => c.Fallback.Contains("Prod théorique (index)", StringComparison.OrdinalIgnoreCase));
+
+		var theoreticalProdByMonth = new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase);
+		var theoreticalProdIndexByMonth = new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase);
+
+		if (theoreticalProdColumn is not null)
+		{
+			foreach (var row in rows)
+			{
+				if (IsTotalRow(row))
+				{
+					break;
+				}
+
+				var month = GetCell(row, 0).Trim();
+				if (string.IsNullOrWhiteSpace(month))
+				{
+					continue;
+				}
+
+				EnsureRowColumnCount(row, theoreticalProdColumn.ColumnIndex);
+				theoreticalProdByMonth[month] = row[theoreticalProdColumn.ColumnIndex];
+
+				if (theoreticalProdIndexColumn is not null)
+				{
+					EnsureRowColumnCount(row, theoreticalProdIndexColumn.ColumnIndex);
+					theoreticalProdIndexByMonth[month] = row[theoreticalProdIndexColumn.ColumnIndex];
+				}
+			}
+		}
+
+		foreach (var block in blocks)
+		{
+			if (!int.TryParse(block.Title, NumberStyles.Integer, CultureInfo.InvariantCulture, out _))
+			{
+				continue;
+			}
+
+			var projectionKwhColumn = block.Columns.FirstOrDefault(c => c.Fallback.Contains("Projection prod (kWh)", StringComparison.OrdinalIgnoreCase));
+			var projectionIndexColumn = block.Columns.FirstOrDefault(c => c.Fallback.Contains("Projection prod (index)", StringComparison.OrdinalIgnoreCase));
+			var consoMaisonColumn = block.Columns.FirstOrDefault(c => c.Fallback.Contains("Conso maison", StringComparison.OrdinalIgnoreCase));
+			var consoReseauColumn = block.Columns.FirstOrDefault(c => c.Fallback.Contains("Conso réseau (kWh)", StringComparison.OrdinalIgnoreCase));
+			var consoReseauPercentColumn = block.Columns.FirstOrDefault(c => c.Fallback.Contains("Conso réseau %", StringComparison.OrdinalIgnoreCase));
+
+			if (consoMaisonColumn is null || consoReseauColumn is null || consoReseauPercentColumn is null)
+			{
+				continue;
+			}
+
+			foreach (var row in rows)
+			{
+				if (IsTotalRow(row))
+				{
+					break;
+				}
+
+				var month = GetCell(row, 0).Trim();
+
+				if (projectionKwhColumn is not null)
+				{
+					EnsureRowColumnCount(row, projectionKwhColumn.ColumnIndex);
+					if (string.IsNullOrWhiteSpace(row[projectionKwhColumn.ColumnIndex])
+						&& !string.IsNullOrWhiteSpace(month)
+						&& theoreticalProdByMonth.TryGetValue(month, out var theoreticalProd)
+						&& !string.IsNullOrWhiteSpace(theoreticalProd))
+					{
+						row[projectionKwhColumn.ColumnIndex] = theoreticalProd;
+					}
+				}
+
+				if (projectionIndexColumn is not null)
+				{
+					EnsureRowColumnCount(row, projectionIndexColumn.ColumnIndex);
+					if (string.IsNullOrWhiteSpace(row[projectionIndexColumn.ColumnIndex])
+						&& !string.IsNullOrWhiteSpace(month)
+						&& theoreticalProdIndexByMonth.TryGetValue(month, out var theoreticalIndex)
+						&& !string.IsNullOrWhiteSpace(theoreticalIndex))
+					{
+						row[projectionIndexColumn.ColumnIndex] = theoreticalIndex;
+					}
+				}
+
+				EnsureRowColumnCount(row, consoMaisonColumn.ColumnIndex);
+				EnsureRowColumnCount(row, consoReseauColumn.ColumnIndex);
+				EnsureRowColumnCount(row, consoReseauPercentColumn.ColumnIndex);
+
+				if (string.IsNullOrWhiteSpace(row[consoReseauPercentColumn.ColumnIndex])
+					&& TryParseCellNumber(row[consoMaisonColumn.ColumnIndex], out var consoMaison)
+					&& TryParseCellNumber(row[consoReseauColumn.ColumnIndex], out var consoReseau)
+					&& consoMaison > 0)
+				{
+					var percent = (consoReseau / consoMaison) * 100;
+					row[consoReseauPercentColumn.ColumnIndex] = $"{percent.ToString("0.##", CultureInfo.GetCultureInfo("fr-FR"))}%";
+				}
+			}
+		}
+	}
+
+	private static void EnsureRowColumnCount(List<string> row, int index)
+	{
+		while (row.Count <= index)
+		{
+			row.Add(string.Empty);
+		}
+	}
+
+	private static bool TryParseCellNumber(string input, out double value)
+	{
+		value = 0;
+		if (string.IsNullOrWhiteSpace(input))
+		{
+			return false;
+		}
+
+		var normalized = input
+			.Replace("kWh", string.Empty, StringComparison.OrdinalIgnoreCase)
+			.Replace("%", string.Empty)
+			.Trim();
+
+		return double.TryParse(normalized, NumberStyles.Any, CultureInfo.GetCultureInfo("fr-FR"), out value)
+			|| double.TryParse(normalized, NumberStyles.Any, CultureInfo.InvariantCulture, out value);
 	}
 
 	private sealed record ColumnConfig(int ColumnIndex, string Fallback, bool IsPercent);

@@ -119,7 +119,6 @@ public class AtmoceCloudBrowserService
 
         if (!page.Url.Contains("login", StringComparison.OrdinalIgnoreCase))
         {
-            progress?.Report("Ouverture de l’écran de connexion...");
             await page.GotoAsync(loginUrl, new PageGotoOptions
             {
                 WaitUntil = WaitUntilState.DOMContentLoaded,
@@ -173,7 +172,6 @@ public class AtmoceCloudBrowserService
 
         if (!consentWasChecked)
         {
-            progress?.Report("Acceptation des conditions d’utilisation...");
             await consentCheckbox.CheckAsync();
             _logger.LogDebug("Case de consentement cochée.");
         }
@@ -364,7 +362,6 @@ public class AtmoceCloudBrowserService
 
         var deadline = DateTime.UtcNow.AddMinutes(2);
         var lastReport = DateTime.MinValue;
-        var lastSelectorIndex = -1;
 
         while (DateTime.UtcNow < deadline)
         {
@@ -378,9 +375,9 @@ public class AtmoceCloudBrowserService
 
             if (!currentUrl.StartsWith(tableUrl, StringComparison.OrdinalIgnoreCase))
             {
-                if (DateTime.UtcNow - lastReport > TimeSpan.FromSeconds(5))
+                if (DateTime.UtcNow - lastReport > TimeSpan.FromSeconds(8))
                 {
-                    progress?.Report($"En attente de la page de relevé quotidien : {currentUrl}");
+                    progress?.Report("En attente de la page de relevé quotidien...");
                     lastReport = DateTime.UtcNow;
                 }
 
@@ -388,16 +385,15 @@ public class AtmoceCloudBrowserService
                 continue;
             }
 
+            if (DateTime.UtcNow - lastReport > TimeSpan.FromSeconds(8))
+            {
+                progress?.Report("Recherche du tableau de données en cours...");
+                lastReport = DateTime.UtcNow;
+            }
+
             for (var index = 0; index < candidates.Length; index++)
             {
                 var selector = candidates[index];
-                if (index != lastSelectorIndex || DateTime.UtcNow - lastReport > TimeSpan.FromSeconds(5))
-                {
-                    progress?.Report($"Recherche du tableau : {selector}");
-                    lastSelectorIndex = index;
-                    lastReport = DateTime.UtcNow;
-                }
-
                 var locator = page.Locator(selector);
                 try
                 {
@@ -411,7 +407,6 @@ public class AtmoceCloudBrowserService
                 }
                 catch (PlaywrightException ex)
                 {
-                    progress?.Report($"Sélecteur en erreur, repli en cours : {selector}");
                     _logger.LogDebug(ex, "Erreur Playwright sur le sélecteur {Selector}", selector);
                 }
             }

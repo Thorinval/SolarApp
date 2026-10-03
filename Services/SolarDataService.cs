@@ -393,6 +393,34 @@ public class SolarDataService
     }
 
     /// <summary>
+    /// Supprimer tous les enregistrements de la base de données
+    /// </summary>
+    public async Task<int> ClearDatabaseRecordsAsync()
+    {
+        try
+        {
+            _logger.LogInformation("Début du vidage de la base de données...");
+
+            var deletedCount = 0;
+            deletedCount += await _dbContext.DeviceDataSnapshots.ExecuteDeleteAsync();
+            deletedCount += await _dbContext.SiteDataSnapshots.ExecuteDeleteAsync();
+            deletedCount += await _dbContext.Devices.ExecuteDeleteAsync();
+            deletedCount += await _dbContext.DeviceAlerts.ExecuteDeleteAsync();
+            deletedCount += await _dbContext.DailyEnergyRecords.ExecuteDeleteAsync();
+            deletedCount += await _dbContext.ApiTokens.ExecuteDeleteAsync();
+            deletedCount += await _dbContext.Sites.ExecuteDeleteAsync();
+
+            _logger.LogInformation("Vidage de la base de données terminé : {DeletedCount} enregistrement(s) supprimé(s)", deletedCount);
+            return deletedCount;
+        }
+        catch (Exception ex)
+        {
+            _logger.LogError(ex, "Erreur lors du vidage de la base de données");
+            throw;
+        }
+    }
+
+    /// <summary>
     /// Marquer une alerte comme résolue
     /// </summary>
     public async Task MarkAlertAsResolvedAsync(int alertId)

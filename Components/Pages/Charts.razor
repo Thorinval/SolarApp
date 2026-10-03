@@ -4,7 +4,6 @@
 @using System.Text.RegularExpressions
 @using SolarApp.Data
 @using SolarApp.Services
-@using Microsoft.EntityFrameworkCore
 @inject AtmocDbContext DbContext
 @inject ExcelDailyReportService ExcelDailyReportService
 @inject IJSRuntime JS
@@ -18,7 +17,7 @@
 	{
 		<div class="alert alert-info">Chargement des données...</div>
 	}
-	else if (labels.Count == 0 && ecowattLabels.Count == 0)
+	else if (labels.Count == 0 && hellowattLabels.Count == 0)
 	{
 		<div class="alert alert-warning">Aucune donnée exploitable pour le graphique.</div>
 	}
@@ -30,7 +29,7 @@
 	{
 		<div class="charts-grid">
 			<div class="chart-panel chart-full-width">
-				<canvas @ref="ecowattMonthlyBillCanvas"></canvas>
+				<canvas @ref="hellowattMonthlyBillCanvas"></canvas>
 			</div>
 
 			<div class="chart-panel">
@@ -69,7 +68,7 @@
 	private ElementReference monthlyProductionCanvas;
 	private ElementReference projectionVsRealIndexCanvas;
 	private ElementReference energyDistributionCanvas;
-	private ElementReference ecowattMonthlyBillCanvas;
+	private ElementReference hellowattMonthlyBillCanvas;
 	private bool isLoading = true;
 	private bool chartRendered;
 	private string? renderError;
@@ -86,11 +85,11 @@
 	private readonly List<double?> projectionIndex2027 = new();
 	private readonly List<double?> realIndex2027 = new();
 
-	private readonly List<string> ecowattLabels = new();
-	private readonly List<double?> ecowattBill2025 = new();
-	private readonly List<double?> ecowattBill2026 = new();
+	private readonly List<string> hellowattLabels = new();
+	private readonly List<double?> hellowattBill2025 = new();
+	private readonly List<double?> hellowattBill2026 = new();
 	private readonly List<AutonomySeriesData> autonomySeries = new();
-	private readonly Dictionary<(int Year, int Month), double> ecowattMonthlyBills = new();
+	private readonly Dictionary<(int Year, int Month), double> hellowattMonthlyBills = new();
 
 	// Répartition des sources d'énergie (Bilan énergie sheet)
 	private readonly List<BilanRowData> bilanData = new();
@@ -132,7 +131,7 @@
 			realIndex2027.Add(ParseNumber(GetCell(row, 17)));       // R
 		}
 
-		await LoadEcowattMonthlyBillsAsync();
+		await LoadHellowattMonthlyBillsAsync();
 
 		// Charger les données du Bilan énergie pour la répartition
 		var bilanResult = await ExcelDailyReportService.ReadSheetContentAsync("Bilan énergie", 16);
@@ -195,23 +194,23 @@
 		isLoading = false;
 	}
 
-	private async Task LoadEcowattMonthlyBillsAsync()
+	private async Task LoadHellowattMonthlyBillsAsync()
 	{
-		ecowattMonthlyBills.Clear();
-		ecowattLabels.Clear();
-		ecowattBill2025.Clear();
-		ecowattBill2026.Clear();
+		hellowattMonthlyBills.Clear();
+		hellowattLabels.Clear();
+		hellowattBill2025.Clear();
+		hellowattBill2026.Clear();
 
-		var ecowattResult = await ExcelDailyReportService.ReadSheetContentAsync("Relevé Ecowatt", 11);
-		var factureIndex = ecowattResult.Headers.FindIndex(h => h.Contains("Facture", StringComparison.OrdinalIgnoreCase));
+		var hellowattResult = await ExcelDailyReportService.ReadSheetContentAsync("Relevé Hellowatt", 11);
+		var factureIndex = hellowattResult.Headers.FindIndex(h => h.Contains("Facture", StringComparison.OrdinalIgnoreCase));
 		if (factureIndex < 0)
 		{
-			BuildEcowattMonthlyBillSeries();
+			BuildHellowattMonthlyBillSeries();
 			return;
 		}
 
 		int? currentYear = null;
-		foreach (var row in ecowattResult.Rows)
+		foreach (var row in hellowattResult.Rows)
 		{
 			if (row.Count == 0)
 			{
@@ -265,10 +264,10 @@
 				continue;
 			}
 
-			ecowattMonthlyBills[(currentYear.Value, monthRank)] = facture.Value;
+			hellowattMonthlyBills[(currentYear.Value, monthRank)] = facture.Value;
 		}
 
-		BuildEcowattMonthlyBillSeries();
+		BuildHellowattMonthlyBillSeries();
 	}
 
 	private Task LoadMonthlyAutonomyAsync()
@@ -314,26 +313,26 @@
 		return Task.CompletedTask;
 	}
 
-	private void BuildEcowattMonthlyBillSeries()
+	private void BuildHellowattMonthlyBillSeries()
 	{
-		ecowattLabels.Clear();
-		ecowattBill2025.Clear();
-		ecowattBill2026.Clear();
+		hellowattLabels.Clear();
+		hellowattBill2025.Clear();
+		hellowattBill2026.Clear();
 
 		for (var month = 1; month <= 12; month++)
 		{
-			ecowattLabels.Add(GetEcowattMonthLabel(month));
-			ecowattBill2025.Add(GetEcowattBillValue(2025, month));
-			ecowattBill2026.Add(GetEcowattBillValue(2026, month));
+			hellowattLabels.Add(GetHellowattMonthLabel(month));
+			hellowattBill2025.Add(GetHellowattBillValue(2025, month));
+			hellowattBill2026.Add(GetHellowattBillValue(2026, month));
 		}
 	}
 
-	private double? GetEcowattBillValue(int year, int month)
+	private double? GetHellowattBillValue(int year, int month)
 	{
-		return ecowattMonthlyBills.TryGetValue((year, month), out var value) ? value : null;
+		return hellowattMonthlyBills.TryGetValue((year, month), out var value) ? value : null;
 	}
 
-	private static string GetEcowattMonthLabel(int month)
+	private static string GetHellowattMonthLabel(int month)
 	{
 		return month switch
 		{
@@ -356,7 +355,7 @@
 
 	protected override async Task OnAfterRenderAsync(bool firstRender)
 	{
-		if (chartRendered || isLoading || (labels.Count == 0 && ecowattLabels.Count == 0 && bilanData.Count == 0))
+		if (chartRendered || isLoading || (labels.Count == 0 && hellowattLabels.Count == 0 && bilanData.Count == 0))
 		{
 			return;
 		}
@@ -383,7 +382,7 @@
 			});
 
 			var status3 = await RenderEnergyDistributionChartAsync();
-			var status4 = await RenderEcowattMonthlyBillChartAsync();
+			var status4 = await RenderHellowattMonthlyBillChartAsync();
 
 			renderStatus = $"Graph1: {status1} | Graph2: {status2} | Graph3: {status3} | Graph4: {status4}";
 			chartRendered = true;
@@ -431,7 +430,7 @@
 		});
 	}
 
-	private async Task<string> RenderEcowattMonthlyBillChartAsync()
+	private async Task<string> RenderHellowattMonthlyBillChartAsync()
 	{
 		var venteYear = bilanData
 			.Where(d => d.Year.HasValue)
@@ -458,10 +457,10 @@
 			})
 			.ToList();
 
-		return await JS.InvokeAsync<string>("solarCharts.renderBillEvolutionChart", ecowattMonthlyBillCanvas, new
+		return await JS.InvokeAsync<string>("solarCharts.renderBillEvolutionChart", hellowattMonthlyBillCanvas, new
 		{
 			title = "Evolution du montant des factures mensuelles",
-			labels = ecowattLabels,
+			labels = hellowattLabels,
 			barValueSuffix = " €",
 			barValueDecimals = 0,
 			lineValueSuffix = " %",
@@ -470,8 +469,8 @@
 			rightAxisMax = 100,
 			barSeries = new[]
 			{
-				new { name = "Facture 2025", values = ecowattBill2025, color = "#1f5d86" },
-				new { name = "Facture 2026", values = ecowattBill2026, color = "#ed7d31" },
+				new { name = "Facture 2025", values = hellowattBill2025, color = "#1f5d86" },
+				new { name = "Facture 2026", values = hellowattBill2026, color = "#ed7d31" },
 				new { name = "Vente kWh", values = venteByMonth, color = "#2f9e44" }
 			},
 			lineSeries = autonomySeries.Select(s => new { name = s.Name, values = s.Values, color = s.Color }).ToList()

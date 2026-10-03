@@ -1,10 +1,9 @@
 ﻿@page "/"
-@using System.IO
 @using SolarApp.Models
 @using SolarApp.Services
-@using Microsoft.EntityFrameworkCore
 @inject SolarDataService SolarDataService
 @inject ExcelDailyReportService ExcelDailyReportService
+@inject AppRuntimeSettingsService AppRuntimeSettingsService
 @inject ILogger<Home> Logger
 @rendermode InteractiveServer
 
@@ -59,13 +58,13 @@
                 </div>
             </a>
 
-            <a href="/releve-ecowatt" class="nav-tile">
+            <a href="/releve-hellowatt" class="nav-tile">
                 <div class="tile-icon">
                     <i class="bi bi-graph-up"></i>
                 </div>
                 <div class="tile-content">
-                    <h3>Relevé Ecowatt</h3>
-                    <p>Signal Ecowatt et tendances</p>
+                    <h3>Relevé Hellowatt</h3>
+                    <p>Consommation électrique depuis Hellowatt</p>
                 </div>
             </a>
 
@@ -75,7 +74,7 @@
                 </div>
                 <div class="tile-content">
                     <h3>Données ensoleillement</h3>
-                    <p>Analyses d'ensoleillement et couverture</p>
+                    <p>Analyses d'ensoleillement et couverture solaire</p>
                 </div>
             </a>
 
@@ -101,19 +100,65 @@
         </div>
     </div>
 
+    <section class="params-section mb-5">
+        <h2 class="mb-3">Initialisation au lancement</h2>
+        <div class="card p-3">
+            <div class="mb-3">
+                <label class="form-label d-block mb-2">Mettre à jour au lancement</label>
+                <div class="d-flex align-items-center gap-2 flex-wrap">
+                    <div class="btn-group" role="group" aria-label="Mettre à jour au lancement">
+                        <button type="button" class="btn btn-sm @(startupSettings.UpdateOnLaunch ? "btn-outline-secondary" : "btn-primary")" @onclick="() => SetUpdateOnLaunchAsync(false)" disabled="@(isSavingStartupSettings || isResettingData || isClearingDatabase)">Non</button>
+                        <button type="button" class="btn btn-sm @(startupSettings.UpdateOnLaunch ? "btn-primary" : "btn-outline-secondary")" @onclick="() => SetUpdateOnLaunchAsync(true)" disabled="@(isSavingStartupSettings || isResettingData || isClearingDatabase)">Oui</button>
+                    </div>
+
+                    <button class="btn btn-sm btn-outline-secondary" @onclick="ResetDataAsync" disabled="@(isImporting || isResettingData || isClearingDatabase || isSavingStartupSettings)">
+                        @if (isResettingData)
+                        {
+                            <span class="spinner-border spinner-border-sm me-2" role="status" aria-hidden="true"></span>
+                        }
+						<i class="bi bi-arrow-clockwise"></i> Charger les données
+                    </button>
+
+                    <button class="btn btn-sm btn-outline-danger" @onclick="ClearDatabaseAsync" disabled="@(isImporting || isResettingData || isClearingDatabase || isSavingStartupSettings)">
+                        @if (isClearingDatabase)
+                        {
+                            <span class="spinner-border spinner-border-sm me-2" role="status" aria-hidden="true"></span>
+                        }
+                        <i class="bi bi-trash"></i> Vider la base de donnée
+                    </button>
+                </div>
+            </div>
+
+            <div class="mb-3">
+                <label class="form-label" for="init-source-home">Source d'initialisation</label>
+                <select id="init-source-home" class="form-select form-select-sm w-auto" style="min-width: 220px;" value="@startupSettings.InitializationSource" @onchange="OnInitializationSourceChanged" disabled="@(isSavingStartupSettings || isResettingData || isClearingDatabase)">
+                    <option value="@InitializationSource.Database">Depuis la BDD</option>
+                    <option value="@InitializationSource.Excel">Depuis Excel</option>
+                </select>
+            </div>
+
+            @if (!string.IsNullOrWhiteSpace(startupSettingsMessage))
+            {
+                <div class="alert @(startupSettingsSaved ? "alert-success" : "alert-danger") mt-2 mb-0">@startupSettingsMessage</div>
+            }
+        </div>
+    </section>
+
     <div class="daily-import-panel mb-5">
         <h2 class="mb-3">Import des données journalières Atmoce</h2>
         <p class="text-muted mb-3">
             Connexion à Atmoce Cloud puis lecture directe de la page de relevé quotidien.
-            Les données récupérées s’affichent dans cette page web sans modifier le fichier Excel d’origine.
+            Les données Atmoce sont mises à jour dans l’application et les feuilles dépendantes (dont l’ensoleillement) sont recalculées automatiquement.
         </p>
-        <button class="btn btn-outline-primary" @onclick="ImportFromAtmoceCloud" disabled="@isImporting">
-            @if (isImporting)
-            {
-                <span class="spinner-border spinner-border-sm me-2" role="status" aria-hidden="true"></span>
-            }
-            <i class="bi bi-cloud-arrow-down"></i> Importer depuis Atmoce Cloud
-        </button>
+        <div class="d-flex flex-wrap align-items-center gap-2">
+            <button class="btn btn-outline-primary" @onclick="ImportFromAtmoceCloud" disabled="@(isImporting || isResettingData || isClearingDatabase)">
+                @if (isImporting)
+                {
+                    <span class="spinner-border spinner-border-sm me-2" role="status" aria-hidden="true"></span>
+                }
+                <i class="bi bi-cloud-arrow-down"></i> Importer depuis Atmoce Cloud
+            </button>
+        </div>
 
         @if (isImporting || !string.IsNullOrWhiteSpace(importStatusMessage))
         {
@@ -132,6 +177,11 @@
             <div class="alert @(isImportSuccess ? "alert-success" : "alert-danger") mt-3 mb-0" role="alert">
                 @importMessage
             </div>
+        }
+
+        @if (!string.IsNullOrWhiteSpace(resetMessage))
+        {
+            <div class="alert @(resetSuccess ? "alert-success" : "alert-danger") mt-2 mb-0">@resetMessage</div>
         }
 
         @if (!string.IsNullOrWhiteSpace(importDataPreview))
@@ -204,7 +254,7 @@
     {
         <div class="row">
             <div class="col-12 mb-3">
-                <button class="btn btn-primary" @onclick="RefreshData">
+                <button class="btn btn-primary" @onclick="RefreshData" disabled="@(!startupSettings.UpdateOnLaunch || isLoading)">
                     <i class="bi bi-arrow-clockwise"></i> Actualiser les données
                 </button>
                 <a href="/sync" class="btn btn-secondary">
@@ -289,6 +339,18 @@
     private bool isImporting;
     private bool isImportSuccess;
     private bool showUpdateOkHint;
+    private bool isSavingStartupSettings;
+    private bool startupSettingsSaved;
+    private bool isResettingData;
+    private bool isClearingDatabase;
+    private bool resetSuccess;
+    private string? startupSettingsMessage;
+    private string? resetMessage;
+    private AppRuntimeSettings startupSettings = new()
+    {
+        UpdateOnLaunch = false,
+        InitializationSource = InitializationSource.Database
+    };
     private string? importStatusMessage;
     private string? importMessage;
     private string? importDataPreview;
@@ -298,9 +360,24 @@
 
     protected override async Task OnInitializedAsync()
     {
+        startupSettings = await AppRuntimeSettingsService.GetSettingsAsync();
+        await LoadDashboardDataAsync(forceLoad: false);
+    }
+
+    private async Task LoadDashboardDataAsync(bool forceLoad)
+    {
         try
         {
             isLoading = true;
+            errorMessage = null;
+            sites = new List<Site>();
+            lastSnapshots = new Dictionary<int, List<SiteDataSnapshot>>();
+
+            if (!forceLoad && !startupSettings.UpdateOnLaunch)
+            {
+                return;
+            }
+
             sites = await SolarDataService.GetSitesAsync();
 
             foreach (var site in sites)
@@ -322,8 +399,16 @@
 
     private async Task RefreshData()
     {
-        isLoading = true;
-        await OnInitializedAsync();
+        if (!startupSettings.UpdateOnLaunch)
+        {
+            resetSuccess = true;
+            resetMessage = $"[{DateTime.Now:HH:mm:ss}] Mise à jour au lancement est désactivée : aucun chargement exécuté.";
+            sites = new List<Site>();
+            lastSnapshots = new Dictionary<int, List<SiteDataSnapshot>>();
+            return;
+        }
+
+        await LoadDashboardDataAsync(forceLoad: true);
     }
 
     private async Task ImportFromAtmoceCloud()
@@ -350,7 +435,7 @@
             var result = await ExcelDailyReportService.ImportFromAtmoceCloudAsync(progress);
             isImportSuccess = result.Success;
             showUpdateOkHint = result.Success;
-            importMessage = result.Message;
+            importMessage = $"[{DateTime.Now:HH:mm:ss}] {result.Message}";
             importDataPreview = result.DataPreview;
             (importPreviewHeaders, importPreviewRows) = ParseImportPreview(result.DataPreview);
             importStatusMessage = result.Success ? "Import terminé." : result.Message;
@@ -359,13 +444,162 @@
         {
             isImportSuccess = false;
             showUpdateOkHint = false;
-            importMessage = "Erreur lors de l'import depuis Atmoce Cloud.";
+            importMessage = $"[{DateTime.Now:HH:mm:ss}] Erreur lors de l'import depuis Atmoce Cloud.";
             importStatusMessage = "Erreur lors de l'import.";
             Logger.LogError(ex, "Erreur lors de l'import Atmoce Cloud");
         }
         finally
         {
             isImporting = false;
+        }
+    }
+
+    private async Task ResetDataAsync()
+    {
+        resetMessage = null;
+        resetSuccess = false;
+        isResettingData = true;
+
+        try
+        {
+            if (!startupSettings.UpdateOnLaunch)
+            {
+                sites = new List<Site>();
+                lastSnapshots = new Dictionary<int, List<SiteDataSnapshot>>();
+                resetSuccess = true;
+                resetMessage = $"[{DateTime.Now:HH:mm:ss}] Mise à jour au lancement est désactivée : aucun chargement exécuté.";
+                return;
+            }
+
+            if (startupSettings.InitializationSource == InitializationSource.Excel)
+            {
+                var importedCount = await SolarDataService.ImportDailyRecordsFromExcelAsync();
+                resetSuccess = true;
+                resetMessage = $"[{DateTime.Now:HH:mm:ss}] Réinitialisation depuis Excel terminée ({importedCount} date(s) importée(s)).";
+            }
+            else
+            {
+                resetSuccess = true;
+                resetMessage = $"[{DateTime.Now:HH:mm:ss}] Réinitialisation depuis la BDD terminée.";
+            }
+
+            await LoadDashboardDataAsync(forceLoad: true);
+        }
+        catch (Exception ex)
+        {
+            resetSuccess = false;
+            resetMessage = $"[{DateTime.Now:HH:mm:ss}] Erreur lors de la réinitialisation des données.";
+            Logger.LogError(ex, "Erreur lors de la réinitialisation des données");
+        }
+        finally
+        {
+            isResettingData = false;
+        }
+    }
+
+    private async Task ClearDatabaseAsync()
+    {
+        resetMessage = null;
+        resetSuccess = false;
+        isClearingDatabase = true;
+
+        try
+        {
+            var deletedCount = await SolarDataService.ClearDatabaseRecordsAsync();
+            sites = new List<Site>();
+            lastSnapshots = new Dictionary<int, List<SiteDataSnapshot>>();
+            resetSuccess = true;
+            resetMessage = $"[{DateTime.Now:HH:mm:ss}] Base de données vidée ({deletedCount} enregistrement(s) supprimé(s)).";
+        }
+        catch (Exception ex)
+        {
+            resetSuccess = false;
+            resetMessage = $"[{DateTime.Now:HH:mm:ss}] Erreur lors du vidage de la base de données.";
+            Logger.LogError(ex, "Erreur lors du vidage de la base de données");
+        }
+        finally
+        {
+            isClearingDatabase = false;
+        }
+    }
+
+    private async Task SetUpdateOnLaunchAsync(bool value)
+    {
+        if (startupSettings.UpdateOnLaunch == value)
+        {
+            startupSettingsSaved = true;
+            startupSettingsMessage = $"[{DateTime.Now:HH:mm:ss}] Option déjà positionnée sur {(value ? "Oui" : "Non")}.";
+            return;
+        }
+
+        startupSettings.UpdateOnLaunch = value;
+
+        if (!value)
+        {
+            startupSettings.InitializationSource = InitializationSource.Database;
+        }
+
+        await PersistStartupSettingsAsync();
+
+        if (!value)
+        {
+            sites = new List<Site>();
+            lastSnapshots = new Dictionary<int, List<SiteDataSnapshot>>();
+        }
+    }
+
+    private async Task OnInitializationSourceChanged(ChangeEventArgs args)
+    {
+        if (args.Value is null)
+        {
+            return;
+        }
+
+        if (!Enum.TryParse<InitializationSource>(args.Value.ToString(), true, out var source))
+        {
+            return;
+        }
+
+        if (startupSettings.InitializationSource == source)
+        {
+            return;
+        }
+
+        startupSettings.InitializationSource = source;
+        await PersistStartupSettingsAsync(showMessage: false);
+    }
+
+    private async Task PersistStartupSettingsAsync(bool showMessage = true)
+    {
+        if (showMessage)
+        {
+            startupSettingsMessage = null;
+            startupSettingsSaved = false;
+        }
+
+        isSavingStartupSettings = true;
+
+        try
+        {
+            await AppRuntimeSettingsService.SaveSettingsAsync(startupSettings);
+            startupSettingsSaved = true;
+            if (showMessage)
+            {
+                startupSettingsMessage = $"[{DateTime.Now:HH:mm:ss}] Paramètres de lancement enregistrés.";
+            }
+        }
+        catch (Exception ex)
+        {
+            startupSettingsSaved = false;
+            if (showMessage)
+            {
+                startupSettingsMessage = $"[{DateTime.Now:HH:mm:ss}] Impossible d'enregistrer les paramètres de lancement.";
+            }
+            Logger.LogError(ex, "Erreur lors de la sauvegarde des paramètres de lancement");
+        }
+        finally
+        {
+            isSavingStartupSettings = false;
         }
     }
 
